@@ -1,0 +1,10 @@
+# Python package generated files
+__pycache__/
+dist/
+build/
+*.egg-info/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
