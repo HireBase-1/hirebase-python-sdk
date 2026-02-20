@@ -652,14 +652,21 @@ def format_scraper_events_table(events: List[dict], full_info: bool = False) -> 
 
 def format_pagination_info(response: dict) -> None:
     """Format pagination information."""
-    page = response.get("page", 1)
-    limit = response.get("limit", 10)
+    jobs = response.get("jobs", [])
+    showing = len(jobs)
     total_count = response.get("total_count", 0)
-    total_pages = response.get("total_pages", 1)
-    
+
+    page_range = response.get("page_range")
+    if page_range:
+        page_display = f"Pages {page_range}"
+    else:
+        page = response.get("page", 1)
+        total_pages = response.get("total_pages", 1)
+        page_display = f"Page {page}/{total_pages}"
+
     console.print(
-        f"\n[dim]Page {page}/{total_pages} | "
-        f"Showing {limit} of {total_count} results[/dim]"
+        f"\n[dim]{page_display} | "
+        f"Showing {showing} of {total_count} results[/dim]"
     )
 
 

@@ -253,8 +253,149 @@ class HirebaseClient:
         
         return self.get("/v2/hirebase/scraper/admin/query", params=params)
     
+    # ==================== Insights API (v2/hirebase/info) ====================
+
+    _INSIGHTS_BASE = "/v2/hirebase/info"
+
+    def insights_summary(self) -> dict:
+        """Get job insights summary (stats, market momentum, average salary US)."""
+        return self.get(f"{self._INSIGHTS_BASE}/insights/summary")
+
+    def insights_trending_roles(
+        self, limit: int = 10, skip: int = 0
+    ) -> dict:
+        """Get trending roles (paginated). limit 1-20, default 10."""
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/trending-roles",
+            params={"limit": limit, "skip": skip},
+        )
+
+    def insights_declining_roles(
+        self, limit: int = 5, skip: int = 0
+    ) -> dict:
+        """Get declining roles (paginated). limit 1-20, default 5."""
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/declining-roles",
+            params={"limit": limit, "skip": skip},
+        )
+
+    def insights_top_roles(
+        self, limit: int = 5, skip: int = 0
+    ) -> dict:
+        """Get top roles globally (paginated). limit 1-20, default 5."""
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/top-roles",
+            params={"limit": limit, "skip": skip},
+        )
+
+    def insights_fastest_growing_roles(
+        self, limit: int = 5, skip: int = 0
+    ) -> dict:
+        """Get fastest-growing roles (paginated). limit 1-20, default 5."""
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/fastest-growing-roles",
+            params={"limit": limit, "skip": skip},
+        )
+
+    def insights_highest_paying_roles(
+        self, limit: int = 5, skip: int = 0
+    ) -> dict:
+        """Get highest-paying roles (paginated). limit 1-20, default 5."""
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/highest-paying-roles",
+            params={"limit": limit, "skip": skip},
+        )
+
+    def insights_hottest_locations(self) -> dict:
+        """Get hottest locations by job activity."""
+        return self.get(f"{self._INSIGHTS_BASE}/insights/hottest-locations")
+
+    def insights_locations_by_momentum(self) -> dict:
+        """Get locations ranked by momentum."""
+        return self.get(f"{self._INSIGHTS_BASE}/insights/locations-by-momentum")
+
+    def insights_top_roles_by_location(
+        self,
+        location_key: Optional[str] = None,
+        limit: int = 5,
+        skip: int = 0,
+    ) -> dict:
+        """Get top roles for a location (or all locations if location_key omitted)."""
+        params: dict = {"limit": limit, "skip": skip}
+        if location_key is not None:
+            params["location_key"] = location_key
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/top-roles-by-location",
+            params=params,
+        )
+
+    def insights_hottest_roles_by_location(
+        self,
+        location_key: Optional[str] = None,
+        limit: int = 5,
+        skip: int = 0,
+    ) -> dict:
+        """Get hottest roles for a location (or all locations if omitted)."""
+        params: dict = {"limit": limit, "skip": skip}
+        if location_key is not None:
+            params["location_key"] = location_key
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/hottest-roles-by-location",
+            params=params,
+        )
+
+    def insights_salary_leaders_by_location(
+        self,
+        location_key: Optional[str] = None,
+        limit: int = 5,
+        skip: int = 0,
+    ) -> dict:
+        """Get salary leaders for a location (or all locations if omitted)."""
+        params: dict = {"limit": limit, "skip": skip}
+        if location_key is not None:
+            params["location_key"] = location_key
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/salary-leaders-by-location",
+            params=params,
+        )
+
+    def insights_role_diversity_by_location(
+        self, location_key: Optional[str] = None
+    ) -> dict:
+        """Get role diversity for a location (or all locations if omitted)."""
+        params = {}
+        if location_key is not None:
+            params["location_key"] = location_key
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/role-diversity-by-location",
+            params=params or None,
+        )
+
+    def insights_market_momentum(self) -> dict:
+        """Get market momentum metrics."""
+        return self.get(f"{self._INSIGHTS_BASE}/insights/market-momentum")
+
+    def insights_average_salary_us(self) -> dict:
+        """Get average salary (US) stats."""
+        return self.get(f"{self._INSIGHTS_BASE}/insights/average-salary-us")
+
+    def insights_role(self, slug: str, history: int = 10) -> dict:
+        """Get single role detail and history by slug. history 1-100, default 10."""
+        return self.get(
+            f"{self._INSIGHTS_BASE}/insights/role/{slug}",
+            params={"history": history},
+        )
+
+    def insights_data_locations(self) -> dict:
+        """Get list of location keys (catalog)."""
+        return self.get(f"{self._INSIGHTS_BASE}/insights/data/locations")
+
+    def insights_data_roles(self) -> dict:
+        """Get list of role slugs (catalog)."""
+        return self.get(f"{self._INSIGHTS_BASE}/insights/data/roles")
+
     # ==================== Health API ====================
-    
+
     def health(self) -> dict:
         """Check API health."""
         return self.get("/v2/health")

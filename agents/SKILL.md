@@ -1,6 +1,6 @@
 ---
 name: hirebase-cli
-description: Interact with the Hirebase Jobs API via command line. Search jobs and companies, get detailed information, and retrieve shareable links. Use when the user asks about job searches, hiring data, company lookups, or needs job/company information to share.
+description: Interact with the Hirebase Jobs API via command line. Search jobs and companies, get job market insights (trending roles, locations, salaries, momentum), and retrieve shareable links. Use when the user asks about job searches, hiring data, company lookups, job market trends, insights, or needs job/company information to share.
 ---
 
 # Hirebase CLI
@@ -83,6 +83,75 @@ When sharing job or company info with users, include:
 | `hirebase blog delete <id>` | Delete article by ID |
 | `hirebase scraper events` | Query scraper events |
 | `hirebase health` | Check API health status |
+| `hirebase insights` | Job market insights (trending roles, locations, salaries, momentum) |
+
+## Insights API (job market trends)
+
+Use **insights** when you need aggregate job market data: which roles are trending or declining, hottest locations, salary leaders, market momentum, or role diversity. All insights endpoints are **public** (same `X-API-Key` as other CLI calls). Output is JSON; use `--json` for raw response.
+
+**Base path:** `{HIREBASE_API_URL}/v2/hirebase/info`. Full spec: `docs/insights-api-spec.md`.
+
+### When to use insights
+
+- **Trending / declining roles** – velocity and acceleration by role
+- **Top / fastest-growing / highest-paying roles** – global or by location
+- **Hottest locations** – where job activity is concentrated
+- **Salary and momentum** – US average salary, market momentum (velocity, positive/negative counts)
+- **Role diversity by location** – active/growing/declining role counts per location
+- **Single role detail** – history and state for a role slug (from data catalogs or other insights)
+
+### Commands (roles & locations)
+
+| Command | Purpose |
+|---------|--------|
+| `hirebase insights summary` | High-level summary (stats, momentum, average salary US) |
+| `hirebase insights market-momentum` | Market velocity and momentum counts |
+| `hirebase insights average-salary-us` | US average/min/max salary, sample size |
+| `hirebase insights trending-roles` | Trending roles (default limit 10, 1–20) |
+| `hirebase insights declining-roles` | Declining roles (default limit 5) |
+| `hirebase insights top-roles` | Top roles globally |
+| `hirebase insights fastest-growing-roles` | Fastest-growing roles |
+| `hirebase insights highest-paying-roles` | Highest-paying roles |
+| `hirebase insights hottest-locations` | Hottest locations by activity |
+| `hirebase insights locations-by-momentum` | Locations by momentum |
+| `hirebase insights top-roles-by-location` | Top roles per location (optional `-l`) |
+| `hirebase insights hottest-roles-by-location` | Hottest roles per location |
+| `hirebase insights salary-leaders-by-location` | Salary leaders per location |
+| `hirebase insights role-diversity-by-location` | Role diversity per location |
+| `hirebase insights role <slug>` | Detail + history for one role (e.g. from catalog) |
+| `hirebase insights data-locations` | List location keys (catalog) |
+| `hirebase insights data-roles` | List role slugs (catalog) |
+
+### Examples
+
+```bash
+# Summary and market
+hirebase insights summary --json
+hirebase insights market-momentum --json
+hirebase insights average-salary-us --json
+
+# Global roles (paginated: --limit 1-20, --skip N)
+hirebase insights trending-roles --limit 10 --json
+hirebase insights top-roles --limit 5
+hirebase insights highest-paying-roles --limit 10
+
+# Locations
+hirebase insights hottest-locations --json
+hirebase insights locations-by-momentum --json
+
+# Roles by location (omit -l for all locations)
+hirebase insights top-roles-by-location --location "San Francisco|California|United States" --limit 5 --json
+hirebase insights salary-leaders-by-location -l "New York|New York|United States"
+
+# Single role (slug from data-roles or other insights)
+hirebase insights role "software-engineer--san-francisco-california-united-states" --history 20 --json
+
+# Catalogs for discovery
+hirebase insights data-locations --json
+hirebase insights data-roles --json
+```
+
+**Query param bounds (from spec):** `limit` 1–20 (default 5 or 10 per command), `skip` ≥ 0, `history` 1–100 for `role`. Location keys use format like `City|Region|Country`.
 
 ## Jobs Commands
 
@@ -100,6 +169,11 @@ hirebase jobs search \
   --limit 10
 ```
 
+**Fetch multiple pages and save to file:**
+```bash
+hirebase jobs search --titles "Software Engineer" --days 14 --limit 100 --page 1..5 --json > jobs.json
+```
+
 **Options:**
 - `-t, --titles`: Job titles (comma-separated)
 - `-k, --keywords`: Search keywords (comma-separated)
@@ -108,7 +182,7 @@ hirebase jobs search \
 - `-d, --days`: Posted within N days
 - `-s, --sort`: Sort by: `relevance` or `date_posted` (default: relevance)
 - `-o, --order`: Sort order: `asc` or `desc` (default: desc)
-- `-p, --page`: Page number
+- `-p, --page`: Page number or inclusive range (e.g. `1` or `1..5`). With a range, runs multiple queries and combines results into a single JSON output.
 - `--limit`: Results per page (max 100)
 - `-f, --full-info`: Show all fields (type, technologies, etc.)
 - `-j, --json`: Output raw JSON
@@ -363,7 +437,7 @@ hirebase companies get scale-ai
 - **Links are for sharing**: Include Hirebase URLs when communicating job/company info to users
 - **IDs for updates**: Blog articles require IDs for update/delete operations
 - **JSON for integration**: Use `--json` when you need structured data for processing
-- **Pagination**: Use `--page` and `--limit` to navigate through large result sets
+- **Pagination**: Use `--page` and `--limit` to navigate through large result sets. Use --page {page_start}..{page_end} to retrieve multiple pages in a single query 
 - **Full info**: Use `-f, --full-info` to see all available fields in table output
 
 ## Error Handling

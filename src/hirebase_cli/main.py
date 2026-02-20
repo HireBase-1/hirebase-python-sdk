@@ -5,7 +5,7 @@ from rich.console import Console
 
 from . import __version__
 from .config import ConfigError
-from .commands import jobs_app, blog_app, companies_app, scraper_app, health_app
+from .commands import jobs_app, blog_app, companies_app, scraper_app, health_app, insights_app
 
 console = Console()
 
@@ -23,6 +23,7 @@ app.add_typer(blog_app, name="blog")
 app.add_typer(companies_app, name="companies")
 app.add_typer(scraper_app, name="scraper")
 app.add_typer(health_app, name="health")
+app.add_typer(insights_app, name="insights")
 
 
 def version_callback(value: bool):

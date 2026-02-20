@@ -71,6 +71,37 @@ def parse_list(value: Optional[str]) -> Optional[List[str]]:
     return [v.strip() for v in value.split(",") if v.strip()]
 
 
+def parse_page(value: str) -> List[int]:
+    """Parse page number or range into list of page numbers.
+
+    Supports:
+    - Single page: "1" -> [1]
+    - Inclusive range: "1..5" -> [1, 2, 3, 4, 5]
+    """
+    value = value.strip()
+    if ".." in value:
+        parts = value.split("..", 1)
+        if len(parts) != 2:
+            raise typer.BadParameter("Invalid page range. Use format: 1..5")
+        try:
+            start = int(parts[0].strip())
+            end = int(parts[1].strip())
+        except ValueError:
+            raise typer.BadParameter("Page range must be integers (e.g. 1..5)")
+        if start < 1 or end < 1:
+            raise typer.BadParameter("Page numbers must be >= 1")
+        if start > end:
+            raise typer.BadParameter("Range start must be <= end (e.g. 1..5)")
+        return list(range(start, end + 1))
+    try:
+        p = int(value)
+        if p < 1:
+            raise typer.BadParameter("Page number must be >= 1")
+        return [p]
+    except ValueError:
+        raise typer.BadParameter("Page must be an integer or range (e.g. 1 or 1..5)")
+
+
 @app.command("search")
 def search(
     titles: Optional[str] = typer.Option(
@@ -101,7 +132,10 @@ def search(
         "desc", "--order", "-o",
         help="Sort order: asc, desc"
     ),
-    page: int = typer.Option(1, "--page", "-p", help="Page number"),
+    page: str = typer.Option(
+        "1", "--page", "-p",
+        help="Page number or inclusive range (e.g. 1 or 1..5)"
+    ),
     limit: int = typer.Option(10, "--limit", help="Results per page (max 100)"),
     full_info: bool = typer.Option(
         False, "--full-info", "-f",
@@ -114,25 +148,57 @@ def search(
 ):
     """Search for jobs with various filters."""
     try:
+        pages = parse_page(page)
         client = get_client()
-        result = client.search_jobs(
-            job_titles=parse_list(titles),
-            keywords=parse_list(keywords),
-            company_keywords=parse_list(company_keywords),
-            geo_locations=parse_locations(locations),
-            days_ago=days_ago,
-            sort_by=sort_by,
-            sort_order=sort_order,
-            page=page,
-            limit=limit,
-        )
-        
+
+        if len(pages) == 1:
+            result = client.search_jobs(
+                job_titles=parse_list(titles),
+                keywords=parse_list(keywords),
+                company_keywords=parse_list(company_keywords),
+                geo_locations=parse_locations(locations),
+                days_ago=days_ago,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                page=pages[0],
+                limit=limit,
+            )
+        else:
+            all_jobs: List[dict] = []
+            first_result = None
+            for p in pages:
+                result = client.search_jobs(
+                    job_titles=parse_list(titles),
+                    keywords=parse_list(keywords),
+                    company_keywords=parse_list(company_keywords),
+                    geo_locations=parse_locations(locations),
+                    days_ago=days_ago,
+                    sort_by=sort_by,
+                    sort_order=sort_order,
+                    page=p,
+                    limit=limit,
+                )
+                if first_result is None:
+                    first_result = result
+                all_jobs.extend(result.get("jobs", []))
+            result = {
+                "jobs": all_jobs,
+                "total_count": first_result.get("total_count") if first_result else 0,
+                "company_count": first_result.get("company_count") if first_result else 0,
+                "page_range": f"{pages[0]}..{pages[-1]}",
+                "pages_fetched": len(pages),
+                "limit": limit,
+                "total_pages": first_result.get("total_pages") if first_result else 0,
+            }
+
         if output_json:
             format_json(result)
         else:
             format_job_table(result.get("jobs", []), full_info=full_info)
             format_pagination_info(result)
-    
+
+    except typer.BadParameter:
+        raise
     except APIError as e:
         format_error(f"API Error: {e.message}")
         raise typer.Exit(1)
