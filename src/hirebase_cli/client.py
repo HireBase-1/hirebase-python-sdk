@@ -100,13 +100,32 @@ class HirebaseClient:
         company_keywords: Optional[list[str]] = None,
         geo_locations: Optional[list[dict]] = None,
         days_ago: Optional[int] = None,
+        date_posted: Optional[str] = None,
+        location_types: Optional[list[str]] = None,
+        yoe_min: Optional[int] = None,
+        yoe_max: Optional[int] = None,
+        include_yoe: bool = False,
+        salary_min: Optional[int] = None,
+        salary_max: Optional[int] = None,
+        currency: Optional[str] = None,
+        include_no_salary: bool = False,
+        job_types: Optional[list[str]] = None,
+        company_name: Optional[str] = None,
+        company_types: Optional[list[str]] = None,
+        industry: Optional[list[str]] = None,
+        sub_industry: Optional[list[str]] = None,
+        visa: bool = False,
+        include_expired: bool = False,
+        hide_recruiting_agencies: bool = False,
+        filter_incomplete_jobs: bool = False,
+        return_raw_description: bool = False,
         sort_by: str = "relevance",
         sort_order: str = "desc",
         page: int = 1,
         limit: int = 10,
     ) -> dict:
         """Search for jobs."""
-        data = {
+        data: dict = {
             "sort_by": sort_by,
             "sort_order": sort_order,
             "page": page,
@@ -122,7 +141,51 @@ class HirebaseClient:
             data["geo_locations"] = geo_locations
         if days_ago is not None:
             data["days_ago"] = days_ago
-        
+        if date_posted:
+            data["date_posted"] = date_posted
+        if location_types:
+            data["location_types"] = location_types
+        if yoe_min is not None or yoe_max is not None:
+            yoe: dict = {}
+            if yoe_min is not None:
+                yoe["min"] = yoe_min
+            if yoe_max is not None:
+                yoe["max"] = yoe_max
+            data["yoe"] = yoe
+        if include_yoe:
+            data["include_yoe"] = "true"
+        if salary_min is not None or salary_max is not None:
+            salary: dict = {}
+            if salary_min is not None:
+                salary["min"] = salary_min
+            if salary_max is not None:
+                salary["max"] = salary_max
+            data["salary"] = salary
+        if include_no_salary:
+            data["include_no_salary"] = "true"
+        if currency:
+            data["currency"] = currency
+        if job_types:
+            data["job_types"] = job_types
+        if company_name:
+            data["company_name"] = company_name
+        if company_types:
+            data["company_types"] = company_types
+        if industry:
+            data["industry"] = industry
+        if sub_industry:
+            data["sub_industry"] = sub_industry
+        if visa:
+            data["visa"] = "true"
+        if include_expired:
+            data["include_expired"] = "true"
+        if hide_recruiting_agencies:
+            data["hide_recruiting_agencies"] = "true"
+        if filter_incomplete_jobs:
+            data["filter_incomplete_jobs"] = "true"
+        if return_raw_description:
+            data["return_raw_description"] = "true"
+
         return self.post("/v2/jobs/search", data)
     
     def get_job(self, job_id: str) -> dict:

@@ -120,13 +120,89 @@ def search(
         None, "--locations", "-l",
         help="Location filter: 'City, Region, Country' or JSON"
     ),
+    location_types: Optional[str] = typer.Option(
+        None, "--location-types",
+        help="Work model filter, comma-separated: Remote, Hybrid, On-site"
+    ),
     days_ago: Optional[int] = typer.Option(
         None, "--days", "-d",
         help="Filter jobs posted within N days"
     ),
+    date_posted: Optional[str] = typer.Option(
+        None, "--date-posted",
+        help="Filter jobs posted on or after this date (YYYY-MM-DD)"
+    ),
+    yoe_min: Optional[int] = typer.Option(
+        None, "--yoe-min",
+        help="Minimum years of experience"
+    ),
+    yoe_max: Optional[int] = typer.Option(
+        None, "--yoe-max",
+        help="Maximum years of experience"
+    ),
+    include_yoe: bool = typer.Option(
+        False, "--include-yoe",
+        help="Include jobs with no years of experience specified"
+    ),
+    salary_min: Optional[int] = typer.Option(
+        None, "--salary-min",
+        help="Minimum salary"
+    ),
+    salary_max: Optional[int] = typer.Option(
+        None, "--salary-max",
+        help="Maximum salary"
+    ),
+    currency: Optional[str] = typer.Option(
+        None, "--currency",
+        help="Currency code, e.g. USD, EUR, GBP, CAD"
+    ),
+    include_no_salary: bool = typer.Option(
+        False, "--include-no-salary",
+        help="Include jobs with no salary information"
+    ),
+    job_types: Optional[str] = typer.Option(
+        None, "--job-types",
+        help="Employment types, comma-separated: Full-time, Part-time, Contract, Internship"
+    ),
+    company_name: Optional[str] = typer.Option(
+        None, "--company-name",
+        help="Exact company name to filter by"
+    ),
+    company_size: Optional[str] = typer.Option(
+        None, "--company-size",
+        help="Company size ranges, comma-separated: 1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000, 5001-10000, 10000+"
+    ),
+    industry: Optional[str] = typer.Option(
+        None, "--industry",
+        help="Industries to filter by (comma-separated)"
+    ),
+    sub_industry: Optional[str] = typer.Option(
+        None, "--sub-industry",
+        help="Sub-industries to filter by (comma-separated)"
+    ),
+    visa: bool = typer.Option(
+        False, "--visa",
+        help="Only show jobs with visa sponsorship"
+    ),
+    include_expired: bool = typer.Option(
+        False, "--include-expired",
+        help="Include expired job listings"
+    ),
+    hide_recruiting_agencies: bool = typer.Option(
+        False, "--hide-recruiting-agencies",
+        help="Hide jobs from recruiting agencies"
+    ),
+    filter_incomplete_jobs: bool = typer.Option(
+        False, "--filter-incomplete-jobs",
+        help="Hide jobs with incomplete data"
+    ),
+    raw_description: bool = typer.Option(
+        False, "--raw-description",
+        help="Return raw job description text"
+    ),
     sort_by: str = typer.Option(
         "relevance", "--sort", "-s",
-        help="Sort by: relevance, date_posted"
+        help="Sort by: relevance, date_posted, salary, company, yoe"
     ),
     sort_order: str = typer.Option(
         "desc", "--order", "-o",
@@ -151,33 +227,43 @@ def search(
         pages = parse_page(page)
         client = get_client()
 
+        _search_kwargs = dict(
+            job_titles=parse_list(titles),
+            keywords=parse_list(keywords),
+            company_keywords=parse_list(company_keywords),
+            geo_locations=parse_locations(locations),
+            location_types=parse_list(location_types),
+            days_ago=days_ago,
+            date_posted=date_posted,
+            yoe_min=yoe_min,
+            yoe_max=yoe_max,
+            include_yoe=include_yoe,
+            salary_min=salary_min,
+            salary_max=salary_max,
+            currency=currency,
+            include_no_salary=include_no_salary,
+            job_types=parse_list(job_types),
+            company_name=company_name,
+            company_types=parse_list(company_size),
+            industry=parse_list(industry),
+            sub_industry=parse_list(sub_industry),
+            visa=visa,
+            include_expired=include_expired,
+            hide_recruiting_agencies=hide_recruiting_agencies,
+            filter_incomplete_jobs=filter_incomplete_jobs,
+            return_raw_description=raw_description,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            limit=limit,
+        )
+
         if len(pages) == 1:
-            result = client.search_jobs(
-                job_titles=parse_list(titles),
-                keywords=parse_list(keywords),
-                company_keywords=parse_list(company_keywords),
-                geo_locations=parse_locations(locations),
-                days_ago=days_ago,
-                sort_by=sort_by,
-                sort_order=sort_order,
-                page=pages[0],
-                limit=limit,
-            )
+            result = client.search_jobs(**_search_kwargs, page=pages[0])
         else:
             all_jobs: List[dict] = []
             first_result = None
             for p in pages:
-                result = client.search_jobs(
-                    job_titles=parse_list(titles),
-                    keywords=parse_list(keywords),
-                    company_keywords=parse_list(company_keywords),
-                    geo_locations=parse_locations(locations),
-                    days_ago=days_ago,
-                    sort_by=sort_by,
-                    sort_order=sort_order,
-                    page=p,
-                    limit=limit,
-                )
+                result = client.search_jobs(**_search_kwargs, page=p)
                 if first_result is None:
                     first_result = result
                 all_jobs.extend(result.get("jobs", []))

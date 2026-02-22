@@ -174,17 +174,54 @@ hirebase jobs search \
 hirebase jobs search --titles "Software Engineer" --days 14 --limit 100 --page 1..5 --json > jobs.json
 ```
 
-**Options:**
-- `-t, --titles`: Job titles (comma-separated)
-- `-k, --keywords`: Search keywords (comma-separated)
-- `-c, --company`: Company keywords (comma-separated)
-- `-l, --locations`: Location filter (see Location Formats below)
-- `-d, --days`: Posted within N days
-- `-s, --sort`: Sort by: `relevance` or `date_posted` (default: relevance)
-- `-o, --order`: Sort order: `asc` or `desc` (default: desc)
-- `-p, --page`: Page number or inclusive range (e.g. `1` or `1..5`). With a range, runs multiple queries and combines results into a single JSON output.
-- `--limit`: Results per page (max 100)
+**Search & query:**
+- `-t, --titles TEXT`: Job titles (comma-separated)
+- `-k, --keywords TEXT`: Keywords to match in titles, descriptions, skills (comma-separated)
+- `-c, --company TEXT`: Company keywords (comma-separated)
+
+**Location:**
+- `-l, --locations TEXT`: Location filter: `"City, Region, Country"` or JSON (see Location Formats below)
+- `--location-types TEXT`: Work model, comma-separated: `Remote`, `Hybrid`, `On-site`
+
+**Date:**
+- `-d, --days INT`: Posted within the last N days
+- `--date-posted TEXT`: Posted on or after an absolute date (YYYY-MM-DD)
+
+**Years of experience:**
+- `--yoe-min INT`: Minimum years of experience
+- `--yoe-max INT`: Maximum years of experience (either bound can be omitted)
+- `--include-yoe`: Also include jobs with no YoE specified
+
+**Salary:**
+- `--salary-min INT`: Minimum salary
+- `--salary-max INT`: Maximum salary
+- `--currency TEXT`: Currency code, e.g. `USD`, `EUR`, `GBP`, `CAD`
+- `--include-no-salary`: Also include jobs with no salary listed
+
+**Job type:**
+- `--job-types TEXT`: Employment type, comma-separated: `Full-time`, `Part-time`, `Contract`, `Internship`
+
+**Company:**
+- `--company-name TEXT`: Exact company name to filter by
+- `--company-size TEXT`: Employee headcount ranges, comma-separated: `1-10`, `11-50`, `51-200`, `201-500`, `501-1000`, `1001-5000`, `5001-10000`, `10000+`
+
+**Industry:**
+- `--industry TEXT`: Industries (comma-separated)
+- `--sub-industry TEXT`: Sub-industries (comma-separated)
+
+**Misc flags (presence = enabled):**
+- `--visa`: Only jobs with visa sponsorship
+- `--include-expired`: Include expired listings
+- `--hide-recruiting-agencies`: Hide staffing/recruiting agency postings
+- `--filter-incomplete-jobs`: Hide jobs with incomplete data
+
+**Output / sorting:**
+- `-s, --sort TEXT`: Sort by: `relevance`, `date_posted`, `salary`, `company`, `yoe` (default: `relevance`)
+- `-o, --order TEXT`: Sort order: `asc` or `desc` (default: `desc`)
+- `-p, --page TEXT`: Page number or inclusive range (e.g. `1` or `1..5`). Range runs multiple queries and merges output into one JSON.
+- `--limit INT`: Results per page (max 100, default 10)
 - `-f, --full-info`: Show all fields (type, technologies, etc.)
+- `--raw-description`: Return raw description text
 - `-j, --json`: Output raw JSON
 
 ### Get Job Details
