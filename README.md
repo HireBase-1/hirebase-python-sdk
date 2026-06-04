@@ -26,6 +26,10 @@ search jobs and companies, run market insights, and export job data at scale.
 - **Self-contained** — the SDK ships its own types and depends only on
   `requests`, `httpx`, and `pydantic`.
 
+> **Guides:** [Getting started](./docs/README.md) ·
+> [Jobs](./docs/jobs.md) · [Companies](./docs/companies.md) ·
+> [Tasks](./docs/tasks.md) · [Errors](./docs/errors.md)
+
 ## Installation
 
 ```bash

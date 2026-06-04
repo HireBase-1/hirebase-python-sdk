@@ -6,6 +6,8 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
+DEFAULT_API_URL = "https://api.hirebase.org"
+
 
 @dataclass
 class Config:
@@ -19,15 +21,16 @@ class Config:
         """Load configuration from environment variables."""
         load_dotenv()
         
-        api_url = os.getenv("HIREBASE_API_URL")
+        api_url = (
+            os.getenv("HIREBASE_BASE_URL")
+            or os.getenv("HIREBASE_API_URL")
+            or DEFAULT_API_URL
+        )
         api_key = os.getenv("HIREBASE_API_KEY")
         
-        if not api_url:
-            raise ConfigError("HIREBASE_API_URL environment variable is not set")
         if not api_key:
             raise ConfigError("HIREBASE_API_KEY environment variable is not set")
         
-        # Remove trailing slash if present
         api_url = api_url.rstrip("/")
         
         return cls(api_url=api_url, api_key=api_key)

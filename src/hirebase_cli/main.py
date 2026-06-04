@@ -49,9 +49,10 @@ def main(
     
     [bold cyan]Environment Variables:[/bold cyan]
     
-    • HIREBASE_API_URL - Base URL for the Hirebase API
+    • HIREBASE_API_KEY - Your API key for authentication (required)
     
-    • HIREBASE_API_KEY - Your API key for authentication
+    • HIREBASE_BASE_URL / HIREBASE_API_URL - API base URL (optional;
+      defaults to https://api.hirebase.org)
     
     [bold cyan]Examples:[/bold cyan]
     
@@ -128,7 +129,7 @@ def search_shortcut(
         raise typer.Exit(1)
     except ConfigError as e:
         format_error(str(e))
-        console.print("\n[dim]Set HIREBASE_API_URL and HIREBASE_API_KEY environment variables[/dim]")
+        console.print("\n[dim]Set HIREBASE_API_KEY (and optionally HIREBASE_BASE_URL)[/dim]")
         raise typer.Exit(1)
     except Exception as e:
         import traceback

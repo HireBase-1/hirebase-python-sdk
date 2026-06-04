@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "Hirebase", email = "support@hirebase.org"}
+    {name = "Hirebase", email = "spencer@hirebase.org"}
 ]
 keywords = ["hirebase", "jobs", "hiring", "api", "sdk", "company data"]
 classifiers = [
