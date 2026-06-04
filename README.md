@@ -1,5 +1,20 @@
-# Hirebase Python SDK
-
+<div align="left" style="margin-bottom: 16px;">
+  <img src="https://www.hirebase.org/hirebase-logo-text.svg" alt="Hirebase Logo" width="160" style="vertical-align: middle; margin-bottom: 8px;" />
+  <div style="margin-top: 12px; display: flex; gap: 12px;">
+    <a href="https://www.hirebase.org/" style="text-decoration:none;">
+      <img src="https://img.shields.io/badge/Website-hirebase.org-blue?style=for-the-badge&logo=Google%20chrome&logoColor=white" alt="Website" />
+    </a>
+    <a href="https://app.hirebase.org/login" style="text-decoration:none;">
+      <img src="https://img.shields.io/badge/Login-Login-green?style=for-the-badge&logo=google&logoColor=white" alt="Login" />
+    </a>
+    <a href="https://app.hirebase.org/signup" style="text-decoration:none;">
+      <img src="https://img.shields.io/badge/Sign%20Up-Create%20Account-purple?style=for-the-badge&logo=addthis&logoColor=white" alt="Sign Up" />
+    </a>
+  </div>
+</div>
+<div>
+  <span style="font-size:2.4rem;font-weight:600;">hirebase-python-sdk</span>
+</div>
 A lean, typed Python client for the [Hirebase API](https://docs.hirebase.org/) —
 search jobs and companies, run market insights, and export job data at scale.
 
