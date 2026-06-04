@@ -1,0 +1,80 @@
+name: Release
+
+# Build and publish the `hirebase` package to PyPI using OpenID Connect
+# (Trusted Publishing). No API token is stored as a secret: GitHub mints a
+# short-lived OIDC token at runtime that PyPI exchanges for upload rights.
+#
+# One-time setup on PyPI (https://pypi.org/manage/account/publishing/):
+#   Project name:    hirebase
+#   Owner:           hirebase-1
+#   Repository:      hirebase-cli          # this repo's name
+#   Workflow name:   release.yml
+#   Environment:     pypi
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+      - name: Run tests
+        run: pytest -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Check artifacts
+        run: |
+          python -m pip install --upgrade twine
+          twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    # The dedicated environment lets you add required reviewers / branch
+    # restrictions before anything is published.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/hirebase
+    permissions:
+      # REQUIRED for Trusted Publishing — this is the OIDC token GitHub mints.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI (OIDC Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
