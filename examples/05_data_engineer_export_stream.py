@@ -23,8 +23,9 @@ def main() -> None:
     query = {
         "job_titles": ["Software Engineer"],
         "location_types": ["Remote"],
-        "days_ago": 14,
-        "limit": 25,
+        "days_ago": 3,
+        "limit": 5,
+        "return_raw_description": 'true',
     }
 
     step(1, "POST /v2/jobs/export → creates background Task")
