@@ -131,6 +131,83 @@ dicts, and new sections are preserved automatically.
 
 ---
 
+## `jobs.neural_search(...)`
+
+Hybrid **lexical + semantic** search ([API reference](https://www.hirebase.org/docs/api-reference/jobs/neural-search-post)). Combine traditional filters with vector similarity from a text query, embeddings, job references, or a stored resume.
+
+Returns a `JobSearchResult`; each job may include `vector_score` (0.0–1.0).
+
+```python
+# Text query + lexical filters
+result = client.jobs.neural_search(
+    text="senior backend engineer building distributed systems",
+    lexical={
+        "location_types": ["Remote", "Hybrid"],
+        "experience": ["Senior"],
+        "days_ago": 30,
+        "limit": 10,
+    },
+)
+
+# Similar to an existing job (by id, Job object, or company/job slug)
+result = client.jobs.neural_search(
+    job="6958cfd211e2763c3491ef8b",
+    lexical={"limit": 10},
+)
+result = client.jobs.neural_search(
+    company_slug="stripe",
+    job_slug="software-engineer-abc123",
+    lexical={"limit": 10},
+)
+
+# Match jobs to an uploaded resume (public flow)
+result = client.jobs.neural_search(
+    resume_id=resume.id,
+    lexical={"location_types": ["Remote"]},
+)
+
+# [Enterprise] Enterprise API (paid customers) use an embedding from resumes.embed()
+embed = client.resumes.embed("./resume.pdf")
+result = client.jobs.neural_search(
+    vectors=[embed.embedding],
+    lexical={"job_titles": ["Software Engineer"]},
+)
+```
+
+### Typed request
+
+```python
+from hirebase import NeuralSearchQuery, NeuralVectorQuery, JobQuery
+
+result = client.jobs.neural_search(
+    NeuralSearchQuery(
+        vector=NeuralVectorQuery(
+            query="machine learning engineer",
+            score_threshold=0.0,
+        ),
+        lexical=JobQuery(
+            location_types=["Remote"],
+            limit=5,
+        ),
+    )
+)
+```
+
+### Vector shortcuts
+
+| Parameter | Maps to |
+|-----------|---------|
+| `text` / `query_text` | `vector.query` |
+| `vectors` | `vector.vectors` (768-d each) |
+| `job_ids` | `vector.job_ids` |
+| `job` / `jobs` | Appended to `vector.job_ids` |
+| `resume_id` / `artifact_id` | `vector.artifact_id` |
+| `company_slug` + `job_slug` | Resolved to a job id, then `vector.job_ids` |
+
+At least one vector or lexical signal is required by the API.
+
+---
+
 ## Exporting jobs
 
 Exports run as a server-side [task](./tasks.md) and produce a downloadable file.

@@ -60,8 +60,13 @@ class Settings:
 
     @property
     def headers(self) -> dict:
+        """Default headers for every request.
+
+        ``Content-Type`` is intentionally omitted here so multipart uploads
+        (resume file fields) get the correct ``multipart/form-data`` boundary.
+        JSON bodies set ``application/json`` per request in the client layer.
+        """
         return {
             "X-API-Key": self.api_key,
             "Accept": "application/json",
-            "Content-Type": "application/json",
         }

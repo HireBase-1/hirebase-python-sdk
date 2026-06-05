@@ -28,7 +28,8 @@ search jobs and companies, run market insights, and export job data at scale.
 
 > **Guides:** [Getting started](./docs/README.md) ·
 > [Jobs](./docs/jobs.md) · [Companies](./docs/companies.md) ·
-> [Tasks](./docs/tasks.md) · [Errors](./docs/errors.md)
+> [Resumes](./docs/resumes.md) · [Tasks](./docs/tasks.md) · [Errors](./docs/errors.md) ·
+> [Examples](./examples/README.md)
 
 ## Installation
 

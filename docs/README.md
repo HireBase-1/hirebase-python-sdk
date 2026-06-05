@@ -8,6 +8,7 @@ A lean, typed Python client for the [Hirebase API](https://docs.hirebase.org/).
 - [Jobs](./jobs.md) — search, fetch, insights, exports, and streaming
 - [Companies](./companies.md) — search, fetch, company jobs, and insights
 - [Tasks](./tasks.md) — polling async work (e.g. exports) to completion
+- [Resumes](./resumes.md) — upload/parse (public) and enterprise embed (vectors)
 - [Errors](./errors.md) — the exception hierarchy and how to handle failures
 
 ## Installation

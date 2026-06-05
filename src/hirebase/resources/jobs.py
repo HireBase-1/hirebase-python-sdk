@@ -6,11 +6,14 @@ from typing import AsyncIterator, Iterator, Optional, Type, Union
 
 from .. import _ops as ops
 from ..models.jobs import Job, JobQuery, JobSearchResult
+from ..models.neural import NeuralSearchQuery, NeuralVectorQuery, coerce_neural_search
 from ..models.insights import JobInsights
 from ..models.tasks import Task
 from ..streaming import iter_jsonl_lines, stream_jobs_file
 
 QueryType = Optional[Union[JobQuery, dict]]
+NeuralQueryType = Optional[Union[NeuralSearchQuery, dict]]
+VectorType = Optional[Union[NeuralVectorQuery, dict]]
 
 
 class JobsResource:
@@ -56,6 +59,63 @@ class JobsResource:
         req = ops.insights_request(query)
         data = self._c._request(req)
         return ops.parse_insights(data, self._c, return_type)
+
+    def neural_search(
+        self,
+        query: NeuralQueryType = None,
+        *,
+        vector: VectorType = None,
+        lexical: QueryType = None,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+        # Vector shortcuts (merged into ``vector``)
+        text: Optional[str] = None,
+        query_text: Optional[str] = None,
+        vectors: Optional[list] = None,
+        job_ids: Optional[list] = None,
+        job: Optional[Union[Job, dict, str]] = None,
+        jobs: Optional[list] = None,
+        resume_id: Optional[str] = None,
+        artifact_id: Optional[str] = None,
+        company_slug: Optional[str] = None,
+        job_slug: Optional[str] = None,
+        score_threshold: Optional[float] = None,
+        return_type: Optional[Type] = None,
+    ) -> Union[JobSearchResult, dict]:
+        """Hybrid lexical + semantic job search.
+
+        Pass a ``NeuralSearchQuery``, a dict with ``vector`` / ``lexical`` keys,
+        or use the keyword shortcuts. At least one vector or lexical signal is
+        required on the API side.
+
+        Vector inputs:
+        - ``text`` / ``query_text`` / ``vector.query`` — natural-language query
+        - ``vectors`` — explicit 768-d embeddings (from :meth:`resumes.embed`)
+        - ``job_ids``, ``job``, ``jobs`` — similar-to-job search
+        - ``resume_id`` / ``artifact_id`` — match jobs to an uploaded resume
+        - ``company_slug`` + ``job_slug`` — resolved to a job id automatically
+
+        See https://www.hirebase.org/docs/api-reference/jobs/neural-search-post
+        """
+        search = coerce_neural_search(query, vector=vector, lexical=lexical)
+        vec = ops.prepare_neural_vector(
+            self._c,
+            search.vector,
+            query=text or query_text,
+            vectors=vectors,
+            job_ids=job_ids,
+            job=job,
+            jobs=jobs,
+            artifact_id=artifact_id,
+            resume_id=resume_id,
+            company_slug=company_slug,
+            job_slug=job_slug,
+            score_threshold=score_threshold,
+        )
+        search = NeuralSearchQuery(vector=vec, lexical=search.lexical)
+        req = ops.neural_search_request(search, page=page, limit=limit)
+        data = self._c._request(req)
+        return ops.parse_job_search(data, self._c, return_type)
 
     def stream_file(
         self,
@@ -113,6 +173,47 @@ class AsyncJobsResource:
         req = ops.insights_request(query)
         data = await self._c._request(req)
         return ops.parse_insights(data, self._c, return_type)
+
+    async def neural_search(
+        self,
+        query: NeuralQueryType = None,
+        *,
+        vector: VectorType = None,
+        lexical: QueryType = None,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+        text: Optional[str] = None,
+        query_text: Optional[str] = None,
+        vectors: Optional[list] = None,
+        job_ids: Optional[list] = None,
+        job: Optional[Union[Job, dict, str]] = None,
+        jobs: Optional[list] = None,
+        resume_id: Optional[str] = None,
+        artifact_id: Optional[str] = None,
+        company_slug: Optional[str] = None,
+        job_slug: Optional[str] = None,
+        score_threshold: Optional[float] = None,
+        return_type: Optional[Type] = None,
+    ) -> Union[JobSearchResult, dict]:
+        search = coerce_neural_search(query, vector=vector, lexical=lexical)
+        vec = ops.prepare_neural_vector(
+            self._c,
+            search.vector,
+            query=text or query_text,
+            vectors=vectors,
+            job_ids=job_ids,
+            job=job,
+            jobs=jobs,
+            artifact_id=artifact_id,
+            resume_id=resume_id,
+            company_slug=company_slug,
+            job_slug=job_slug,
+            score_threshold=score_threshold,
+        )
+        search = NeuralSearchQuery(vector=vec, lexical=search.lexical)
+        req = ops.neural_search_request(search, page=page, limit=limit)
+        data = await self._c._request(req)
+        return ops.parse_job_search(data, self._c, return_type)
 
     def stream_file(
         self,

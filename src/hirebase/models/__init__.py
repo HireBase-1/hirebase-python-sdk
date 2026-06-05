@@ -21,6 +21,8 @@ from .companies import (
 )
 from .tasks import Task, TaskState
 from .insights import JobInsights
+from .neural import NeuralSearchQuery, NeuralVectorQuery
+from .resumes import EmbeddingResult, ResumeEmbedResponse, ResumeRecord
 
 __all__ = [
     "BoundModel",
@@ -40,4 +42,9 @@ __all__ = [
     "Task",
     "TaskState",
     "JobInsights",
+    "NeuralVectorQuery",
+    "NeuralSearchQuery",
+    "ResumeRecord",
+    "ResumeEmbedResponse",
+    "EmbeddingResult",
 ]

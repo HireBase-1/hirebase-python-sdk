@@ -4,6 +4,7 @@ client.tasks)."""
 from .jobs import AsyncJobsResource, JobsResource
 from .companies import AsyncCompaniesResource, CompaniesResource
 from .tasks import AsyncTasksResource, TasksResource
+from .resumes import AsyncResumesResource, ResumesResource
 
 __all__ = [
     "JobsResource",
@@ -12,4 +13,6 @@ __all__ = [
     "AsyncCompaniesResource",
     "TasksResource",
     "AsyncTasksResource",
+    "ResumesResource",
+    "AsyncResumesResource",
 ]

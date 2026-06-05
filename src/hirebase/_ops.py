@@ -24,6 +24,15 @@ from .models.companies import (
 )
 from .models.insights import JobInsights
 from .models.jobs import Job, JobQuery, JobSearchResult, coerce_query
+from .models.neural import (
+    NeuralSearchQuery,
+    NeuralVectorQuery,
+    coerce_neural_search,
+    coerce_neural_vector,
+    extract_job_id,
+    merge_job_ids,
+)
+from .models.resumes import ResumeEmbedResponse, ResumeRecord
 from .models.tasks import Task
 
 # Sentinel meaning "return typed models" (the default).
@@ -38,6 +47,8 @@ class Request:
     path: str
     params: Optional[Dict[str, Any]] = None
     json: Optional[Dict[str, Any]] = field(default=None)
+    # Multipart upload: ``{"file": (filename, fileobj, content_type)}``
+    files: Optional[Dict[str, Any]] = None
 
 
 def _want_dict(return_type: Optional[Type]) -> bool:
@@ -102,6 +113,75 @@ def insights_request(
 ) -> Request:
     q = coerce_query(query)
     return Request("POST", path, json=q.to_payload())
+
+
+def get_company_job_request(company_slug: str, job_slug: str) -> Request:
+    return Request(
+        "GET",
+        f"/v2/hirebase/companies/{company_slug}/jobs/{job_slug}",
+    )
+
+
+def resolve_job_id_from_slug(client: Any, company_slug: str, job_slug: str) -> str:
+    data = client._request(get_company_job_request(company_slug, job_slug))
+    jobs = data.get("jobs") or []
+    if not jobs:
+        raise ValueError(
+            f"No job found for company_slug={company_slug!r} job_slug={job_slug!r}"
+        )
+    return extract_job_id(jobs[0])
+
+
+def prepare_neural_vector(
+    client: Any,
+    vector: Optional[Union[NeuralVectorQuery, dict]] = None,
+    *,
+    query: Optional[str] = None,
+    vectors: Optional[list] = None,
+    job_ids: Optional[list] = None,
+    job: Optional[Union[Job, dict, str]] = None,
+    jobs: Optional[list] = None,
+    artifact_id: Optional[str] = None,
+    resume_id: Optional[str] = None,
+    company_slug: Optional[str] = None,
+    job_slug: Optional[str] = None,
+    score_threshold: Optional[float] = None,
+) -> NeuralVectorQuery:
+    """Coerce shortcuts and resolve slug/job references into a vector spec."""
+    v = coerce_neural_vector(
+        vector,
+        query=query,
+        vectors=vectors,
+        job_ids=job_ids,
+        artifact_id=artifact_id,
+        resume_id=resume_id,
+        score_threshold=score_threshold,
+    )
+    v = merge_job_ids(v, job=job, jobs=jobs)
+    if company_slug and job_slug:
+        jid = resolve_job_id_from_slug(client, company_slug, job_slug)
+        v = merge_job_ids(v, job_ids=[jid])
+    elif company_slug or job_slug:
+        raise ValueError("company_slug and job_slug must be provided together")
+    return v
+
+
+def neural_search_request(
+    search: NeuralSearchQuery,
+    *,
+    page: Optional[int] = None,
+    limit: Optional[int] = None,
+) -> Request:
+    lexical = search.lexical or JobQuery()
+    if page is not None:
+        lexical.page = page
+    if limit is not None:
+        lexical.limit = limit
+    body = NeuralSearchQuery(
+        vector=search.vector,
+        lexical=lexical,
+    ).to_payload()
+    return Request("POST", "/v2/jobs/neural-search", json=body)
 
 
 def parse_insights(
@@ -245,6 +325,44 @@ def company_insights_request(
         f"/v2/hirebase/companies/{slug}/insights",
         json=q.to_payload(),
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Resumes
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def resume_upload_request(files: Dict[str, Any]) -> Request:
+    return Request("POST", "/v2/resumes/upload/", files=files)
+
+
+def resume_embed_request(files: Dict[str, Any]) -> Request:
+    """Enterprise: parse + embed in one call; resume is not stored."""
+    return Request("POST", "/v2/resumes/embed", files=files)
+
+
+def resume_get_request(resume_id: str) -> Request:
+    return Request("GET", f"/v2/resumes/{resume_id}")
+
+
+def resume_parse_request(resume_id: str) -> Request:
+    return Request("POST", f"/v2/resumes/{resume_id}/parse")
+
+
+def parse_resume_record(
+    data: dict, return_type: Optional[Type]
+) -> Union[ResumeRecord, dict]:
+    if _want_dict(return_type):
+        return data
+    return ResumeRecord.model_validate(data)
+
+
+def parse_resume_embed(
+    data: dict, return_type: Optional[Type]
+) -> Union[ResumeEmbedResponse, dict]:
+    if _want_dict(return_type):
+        return data
+    return ResumeEmbedResponse.model_validate(data)
 
 
 def company_slug_of(company: Union[Company, dict, str]) -> str:

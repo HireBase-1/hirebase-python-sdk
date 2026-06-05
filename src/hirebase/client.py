@@ -15,10 +15,10 @@ from .config import Settings
 from .exceptions import error_from_response
 from .resources.companies import AsyncCompaniesResource, CompaniesResource
 from .resources.jobs import AsyncJobsResource, JobsResource
+from .resources.resumes import AsyncResumesResource, ResumesResource
 from .resources.tasks import AsyncTasksResource, TasksResource
 
 _DOWNLOAD_CHUNK = 1024 * 256
-
 
 class Client:
     """Synchronous Hirebase API client.
@@ -47,6 +47,7 @@ class Client:
         self.jobs = JobsResource(self)
         self.companies = CompaniesResource(self)
         self.tasks = TasksResource(self)
+        self.resumes = ResumesResource(self)
 
     @property
     def base_url(self) -> str:
@@ -56,13 +57,18 @@ class Client:
         return f"{self._settings.base_url}{path}"
 
     def _request(self, req: ops.Request) -> Any:
-        resp = self._session.request(
-            req.method,
-            self._url(req.path),
-            params=req.params,
-            json=req.json,
-            timeout=self._settings.timeout,
-        )
+        kwargs: dict = {
+            "method": req.method,
+            "url": self._url(req.path),
+            "params": req.params,
+            "timeout": self._settings.timeout,
+        }
+        if req.files is not None:
+            kwargs["files"] = req.files
+        else:
+            kwargs["json"] = req.json
+            kwargs["headers"] = {"Content-Type": "application/json"}
+        resp = self._session.request(**kwargs)
         return _handle_response(resp.status_code, resp.content, resp)
 
     def stream_file(
@@ -134,15 +140,26 @@ class AsyncClient:
         self.jobs = AsyncJobsResource(self)
         self.companies = AsyncCompaniesResource(self)
         self.tasks = AsyncTasksResource(self)
+        self.resumes = AsyncResumesResource(self)
 
     @property
     def base_url(self) -> str:
         return self._settings.base_url
 
     async def _request(self, req: ops.Request) -> Any:
-        resp = await self._http.request(
-            req.method, req.path, params=req.params, json=req.json
-        )
+        if req.files is not None:
+            resp = await self._http.request(
+                req.method, req.path, params=req.params, files=req.files, timeout=self._settings.timeout
+            )
+        else:
+            resp = await self._http.request(
+                req.method,
+                req.path,
+                params=req.params,
+                json=req.json,
+                timeout=self._settings.timeout,
+                headers={"Content-Type": "application/json"},
+            )
         return _handle_response(resp.status_code, resp.content, resp)
 
     async def stream_file(

@@ -81,6 +81,10 @@ class Job(BoundModel):
     growth_score: Optional[float] = None
 
     score: Optional[float] = None
+    vector_score: Optional[float] = Field(
+        default=None,
+        description="Semantic similarity score from neural search (0.0–1.0).",
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - cosmetic
         return f"Job(title={self.job_title!r}, company={self.company_name!r})"
