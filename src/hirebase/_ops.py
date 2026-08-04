@@ -34,6 +34,7 @@ from .models.neural import (
 )
 from .models.resumes import ResumeEmbedResponse, ResumeRecord
 from .models.tasks import Task
+from .models.usage import MeterUsage, Meters, UsageSummary
 
 # Sentinel meaning "return typed models" (the default).
 TYPED = None
@@ -375,3 +376,50 @@ def company_slug_of(company: Union[Company, dict, str]) -> str:
         if slug:
             return str(slug)
     raise TypeError("Expected a Company, company dict, or slug string.")
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Usage
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def usage_summary_request() -> Request:
+    return Request("GET", "/v2/billing/usage/summary")
+
+
+def parse_usage_summary(
+    data: dict, client: Any, return_type: Optional[Type]
+) -> Union[UsageSummary, dict]:
+    if _want_dict(return_type):
+        return data
+    summary = UsageSummary.model_validate(data)
+    return summary._bind(client)
+
+
+def parse_usage_meter(
+    data: dict,
+    meter: Meters,
+    client: Any,
+    return_type: Optional[Type],
+) -> Union[MeterUsage, dict]:
+    if _want_dict(return_type):
+        meters = data.get("meters") or []
+        for row in meters:
+            if row.get("event_name") == meter.value:
+                return row
+        from .exceptions import NotFoundError
+
+        raise NotFoundError(
+            f"Meter {meter.value!r} not found in usage summary.",
+            status_code=404,
+        )
+    summary = UsageSummary.model_validate(data)
+    row = summary.meter(meter)
+    if row is None:
+        from .exceptions import NotFoundError
+
+        raise NotFoundError(
+            f"Meter {meter.value!r} not found in usage summary.",
+            status_code=404,
+        )
+    return row._bind(client)

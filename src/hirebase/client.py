@@ -17,6 +17,7 @@ from .resources.companies import AsyncCompaniesResource, CompaniesResource
 from .resources.jobs import AsyncJobsResource, JobsResource
 from .resources.resumes import AsyncResumesResource, ResumesResource
 from .resources.tasks import AsyncTasksResource, TasksResource
+from .resources.usage import AsyncUsageResource, UsageResource
 
 _DOWNLOAD_CHUNK = 1024 * 256
 
@@ -48,6 +49,7 @@ class Client:
         self.companies = CompaniesResource(self)
         self.tasks = TasksResource(self)
         self.resumes = ResumesResource(self)
+        self.usage = UsageResource(self)
 
     @property
     def base_url(self) -> str:
@@ -141,6 +143,7 @@ class AsyncClient:
         self.companies = AsyncCompaniesResource(self)
         self.tasks = AsyncTasksResource(self)
         self.resumes = AsyncResumesResource(self)
+        self.usage = AsyncUsageResource(self)
 
     @property
     def base_url(self) -> str:

@@ -23,6 +23,7 @@ from .tasks import Task, TaskState
 from .insights import JobInsights
 from .neural import NeuralSearchQuery, NeuralVectorQuery
 from .resumes import EmbeddingResult, ResumeEmbedResponse, ResumeRecord
+from .usage import MeterUsage, Meters, UsageSummary
 
 __all__ = [
     "BoundModel",
@@ -47,4 +48,7 @@ __all__ = [
     "ResumeRecord",
     "ResumeEmbedResponse",
     "EmbeddingResult",
+    "MeterUsage",
+    "Meters",
+    "UsageSummary",
 ]

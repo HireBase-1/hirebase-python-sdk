@@ -29,7 +29,7 @@ def main() -> None:
             {"city": "San Francisco", "region": "California", "country": "United States"}
         ],
         "days_ago": 30,
-        "limit": 5,
+        "limit": 100,
         "page": 1,
     }
 

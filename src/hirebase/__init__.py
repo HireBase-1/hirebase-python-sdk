@@ -61,6 +61,9 @@ from .models import (
     Task,
     TaskState,
     YoeRange,
+    MeterUsage,
+    Meters,
+    UsageSummary,
 )
 
 __all__ = [
@@ -86,6 +89,9 @@ __all__ = [
     "Location",
     "SalaryRange",
     "YoeRange",
+    "MeterUsage",
+    "Meters",
+    "UsageSummary",
     # Exceptions
     "HirebaseError",
     "ConfigurationError",
