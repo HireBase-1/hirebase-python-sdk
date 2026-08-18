@@ -104,8 +104,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+      GITHUB_EVENT_NAME: ${{ github.event_name }}
       COMMIT_MESSAGE: ${{ github.event.head_commit.message || github.event.release.name || github.event.release.tag_name }}
-      JOB_STATUS: ${{ needs.test.result == 'success' && needs.build.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') && 'success' || 'failure' }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+      PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      BUILD_RESULT: ${{ needs.test.result == 'success' && needs.build.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') && 'success' || 'failure' }}
+      PUBLISH_RESULT: ${{ needs.publish.result }}
       PROJECT_NAME: hirebase
       PACKAGE_VERSION: ${{ needs.build.outputs.version }}
       PACKAGE_URL: https://pypi.org/project/hirebase/${{ needs.build.outputs.version }}/
@@ -124,23 +132,44 @@ jobs:
             exit 0
           fi
 
-          if [[ "$JOB_STATUS" == "success" ]]; then
+          if [[ "$BUILD_RESULT" == "success" ]]; then
             STATUS="Success"
             EMOJI="✅"
             COLOR="#2eb886"
-            GRAPHIC="🟢 Build Success"
+            GRAPHIC="🟢 CI passed"
           else
             STATUS="Failed"
             EMOJI="❌"
             COLOR="#e01e5a"
-            GRAPHIC="🔴 Build Failed"
+            GRAPHIC="🔴 CI failed"
           fi
 
-          SHORT_SHA="$(printf '%s' "$FULL_SHA" | cut -c1-8)"
-          COMMIT_MSG="$(printf '%s' "$COMMIT_MESSAGE" | head -n1 | cut -c1-120)"
-          if [[ -z "$COMMIT_MSG" ]]; then COMMIT_MSG="n/a"; fi
+          case "${GITHUB_EVENT_NAME}" in
+            pull_request)
+              TRIGGER="Pull request #${PR_NUMBER} → ${PR_BASE_REF}"
+              SUMMARY="${PR_TITLE:-n/a}"
+              ;;
+            push)
+              TRIGGER="Push to ${BRANCH_NAME}"
+              SUMMARY="$(printf '%s' "${COMMIT_MESSAGE:-}" | head -n1 | cut -c1-120)"
+              ;;
+            release)
+              TRIGGER="Release ${RELEASE_TAG:-published}"
+              SUMMARY="$(printf '%s' "${COMMIT_MESSAGE:-}" | head -n1 | cut -c1-120)"
+              ;;
+            workflow_dispatch)
+              TRIGGER="Manual workflow dispatch"
+              SUMMARY="$(printf '%s' "${COMMIT_MESSAGE:-}" | head -n1 | cut -c1-120)"
+              ;;
+            *)
+              TRIGGER="${GITHUB_EVENT_NAME}"
+              SUMMARY="$(printf '%s' "${COMMIT_MESSAGE:-}" | head -n1 | cut -c1-120)"
+              ;;
+          esac
+          [[ -z "$SUMMARY" ]] && SUMMARY="n/a"
 
-          TITLE="${EMOJI} ${PROJECT_NAME} Built: ${STATUS}"
+          SHORT_SHA="$(printf '%s' "$FULL_SHA" | cut -c1-8)"
+          TITLE="${EMOJI} ${PROJECT_NAME} CI: ${STATUS}"
 
           fields='[]'
           add_field() {
@@ -149,14 +178,21 @@ jobs:
             fields=$(jq -c --arg l "$label" --arg v "$value" \
               '. + [{type:"mrkdwn", text: ("*" + $l + "*\n`" + $v + "`")}]' <<<"$fields")
           }
-          add_field "Package" "$PROJECT_NAME"
-          add_field "Version" "$PACKAGE_VERSION"
-          add_field "Package URL" "$PACKAGE_URL"
-          add_field "Tests" "$TEST_SUMMARY"
-          add_field "Branch" "$BRANCH_NAME"
+          add_field "Trigger" "$TRIGGER"
+          add_field "Result" "$STATUS"
+          add_field "Branch" "${PR_HEAD_REF:-$BRANCH_NAME}"
           add_field "Commit" "$SHORT_SHA"
-          add_field "Pushed by" "$ACTOR"
-          add_field "Commit message" "$COMMIT_MSG"
+          add_field "Triggered by" "$ACTOR"
+          add_field "Summary" "$SUMMARY"
+          add_field "Test job" "${{ needs.test.result }}"
+          add_field "Build job" "${{ needs.build.result }}"
+          if [[ "${PUBLISH_RESULT:-}" != "skipped" ]]; then
+            add_field "Publish job" "${PUBLISH_RESULT:-n/a}"
+          fi
+          if [[ -n "${TEST_SUMMARY:-}" && "$TEST_SUMMARY" != "n/a" ]]; then add_field "Tests" "$TEST_SUMMARY"; fi
+          if [[ -n "${PACKAGE_VERSION:-}" ]]; then add_field "Version" "$PACKAGE_VERSION"; fi
+          if [[ "${PUBLISH_RESULT:-}" == "success" ]]; then add_field "PyPI URL" "$PACKAGE_URL"; fi
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" && -n "${PR_URL:-}" ]]; then add_field "PR URL" "$PR_URL"; fi
 
           PAYLOAD=$(jq -n \
             --arg title "$TITLE" \
