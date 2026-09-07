@@ -9,8 +9,15 @@ working when the API adds new fields before the SDK is updated.
 """
 
 from .base import BoundModel
-from .common import CompanySizeRange, Location, SalaryRange, YoeRange
-from .jobs import Job, JobQuery, JobSearchResult
+from .common import (
+    CompanySizeRange,
+    FloatRange,
+    GeoFilterParams,
+    Location,
+    SalaryRange,
+    YoeRange,
+)
+from .jobs import Job, JobQuery, JobSearchResult, SalaryBenchmarkRequest
 from .companies import (
     Company,
     CompanyFunding,
@@ -28,12 +35,15 @@ from .usage import MeterUsage, Meters, UsageSummary
 __all__ = [
     "BoundModel",
     "Location",
+    "GeoFilterParams",
     "SalaryRange",
     "YoeRange",
     "CompanySizeRange",
+    "FloatRange",
     "Job",
     "JobQuery",
     "JobSearchResult",
+    "SalaryBenchmarkRequest",
     "Company",
     "CompanyQuery",
     "CompanySearchResult",

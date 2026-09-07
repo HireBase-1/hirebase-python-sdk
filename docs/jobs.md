@@ -22,7 +22,8 @@ result = client.jobs.search({
     "job_titles": ["Software Engineer", "Product Engineer"],
     "locations": [{"city": "San Francisco", "region": "California",
                    "country": "United States"}],
-    "location_types": ["Remote", "Hybrid"],
+    "geofilter_params": {"mode": "auto", "radius": 35, "unit": "mi"},
+    "location_types": ["Remote", "Hybrid", "In-Person"],
     "limit": 20,
 })
 
@@ -53,7 +54,9 @@ query = JobQuery(
     keywords=["python", "kubernetes"],
     salary=SalaryRange(min=150_000, currency="USD"),
     yoe=YoeRange(min=3, max=8),
-    location_types=["Remote"],
+    geo_locations=[{"city": "Austin", "region": "Texas", "country": "United States"}],
+    geofilter_params={"mode": "auto", "radius": 35, "unit": "mi"},
+    location_types=["Remote", "Hybrid", "In-Person"],
     visa=True,
     sort_by="date_posted",
     sort_order="desc",
@@ -65,13 +68,14 @@ result = client.jobs.search(query)
 
 | Field | Type | Notes |
 |---|---|---|
-| `job_titles` | `list[str]` | Titles to match |
-| `keywords` | `list[str]` | Match in title/description/skills/tech |
+| `job_titles` | `list[str]` | Titles to match. Each title is AND-of-words, titles are OR'd. |
+| `keywords` | `list[str]` | **Hard must** (at least one keyword) on description / skills / technologies / benefits — **not** `job_title`. Use titles for role recall, not keywords. |
 | `company_names` | `str \| list[str]` | Exact company name(s); alias `company_name` |
 | `company_slugs` | `str \| list[str]` | Hirebase company slug(s); alias `company_slug` |
-| `geo_locations` | `list[Location]` | **Alias: `locations`** — `{city, region, country}` |
+| `geo_locations` | `list[Location]` | **Alias: `locations`** — `{city, region, country}` only. Do **not** send `coordinates` on the filter (`[lon, lat]` is HTTP 422). The API geocodes. |
+| `geofilter_params` | `GeoFilterParams` | `{mode, radius, unit}`. `mode="auto"` (default) → `geoWithin` circle when a city is present, phrase-match otherwise. App default radius is 25mi. |
 | `location_group` | `str` | Predefined group, e.g. `"Bay_Area"` |
-| `location_types` | `list[str]` | `Remote`, `Hybrid`, `On-site` |
+| `location_types` | `list[str]` | Canonical: `Remote`, `Hybrid`, `In-Person` (`On-site` does not match) |
 | `experience` | `list[str]` | YOE bands: `Entry`, `Mid`, `Senior`, ... |
 | `yoe` | `YoeRange` | `{min, max}` years |
 | `salary` | `SalaryRange` | `{min, max, currency}` |
@@ -225,6 +229,48 @@ if not success:
 # result is a dict with: download_url, file_size, record_count, expiry_time
 client.stream_file(result["download_url"], file_path="./jobs.json")
 ```
+
+See [Tasks](./tasks.md) for polling options (`interval`, `timeout`,
+`on_progress`).
+
+---
+
+## Salary benchmarking
+
+### `jobs.salary_benchmark(payload=None, **fields)` → `Task`
+
+Queues a posted-salary report. The cloud worker expands titles, searches live
+and expired jobs, and writes the report onto the task result. Pass a dict,
+keyword fields, or a typed `SalaryBenchmarkRequest`.
+
+```python
+from hirebase import SalaryBenchmarkRequest
+
+task = client.jobs.salary_benchmark(
+    SalaryBenchmarkRequest(
+        job_title="Senior Software Engineer",
+        yoe_range={"min": 5, "max": 10},
+        geo_locations=[{"country": "United States"}],
+        days_ago=90,
+    )
+)
+success, report = client.tasks.poll(task, interval=5, timeout=900)
+if success:
+    print(report["market"]["salary"]["p50"], report["confidence"]["grade"])
+```
+
+Same method on `AsyncClient`:
+
+```python
+async with hirebase.AsyncClient() as client:
+    task = await client.jobs.salary_benchmark(
+        job_title="Senior Software Engineer",
+        geo_locations=[{"country": "United States"}],
+    )
+    success, report = await client.tasks.poll(task, interval=5, timeout=900)
+```
+
+`public_url` wins when both a posting URL and manual fields are sent.
 
 See [Tasks](./tasks.md) for polling options (`interval`, `timeout`,
 `on_progress`).

@@ -16,6 +16,7 @@ class Meters(str, Enum):
     VECTOR_API = "m_vector_api_calls"
     EXPORTS = "m_exports"
     INSIGHTS = "m_insights_calls"
+    SALARY_BENCHMARKS = "m_salary_benchmarks"
 
 
 class MeterUsage(BoundModel):

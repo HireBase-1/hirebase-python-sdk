@@ -5,13 +5,14 @@ from __future__ import annotations
 from typing import AsyncIterator, Iterator, Optional, Type, Union
 
 from .. import _ops as ops
-from ..models.jobs import Job, JobQuery, JobSearchResult
+from ..models.jobs import Job, JobQuery, JobSearchResult, SalaryBenchmarkRequest
 from ..models.neural import NeuralSearchQuery, NeuralVectorQuery, coerce_neural_search
 from ..models.insights import JobInsights
 from ..models.tasks import Task
 from ..streaming import iter_jsonl_lines, stream_jobs_file
 
 QueryType = Optional[Union[JobQuery, dict]]
+SalaryBenchmarkType = Optional[Union[SalaryBenchmarkRequest, dict]]
 NeuralQueryType = Optional[Union[NeuralSearchQuery, dict]]
 VectorType = Optional[Union[NeuralVectorQuery, dict]]
 
@@ -51,6 +52,72 @@ class JobsResource:
         req = ops.export_jobs_request(query, format=format)
         data = self._c._request(req)
         return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
+
+    def estimate(
+        self,
+        query: QueryType = None,
+        *,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> int:
+        """Return how many jobs a search would bill (``min(limit, matches)``)."""
+        req = ops.estimate_jobs_request(query, page=page, limit=limit)
+        data = self._c._request(req)
+        return int(data["cost"])
+
+    def expired(
+        self,
+        since: str,
+        *,
+        page: int = 1,
+        limit: int = 100,
+    ) -> dict:
+        """List expired jobs since ``since`` (ISO date or datetime)."""
+        req = ops.expired_jobs_request(since, page=page, limit=limit)
+        return self._c._request(req)
+
+    def export_expired(
+        self,
+        since: str,
+        *,
+        limit: Optional[int] = None,
+        notify: bool = False,
+    ) -> Task:
+        """Kick off an async JSONL export of expired jobs since ``since``."""
+        req = ops.export_expired_jobs_request(since, limit=limit, notify=notify)
+        data = self._c._request(req)
+        return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
+
+    def salary_benchmark(
+        self, payload: SalaryBenchmarkType = None, **fields
+    ) -> Task:
+        """Queue a posted-salary benchmark. Poll with ``client.tasks.poll``."""
+        req = ops.salary_benchmark_request(payload, **fields)
+        data = self._c._request(req)
+        return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
+
+    def vsearch(
+        self,
+        query: QueryType = None,
+        *,
+        search_type: str = "summary",
+        text: Optional[str] = None,
+        job_id: Optional[str] = None,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+        return_type: Optional[Type] = None,
+    ) -> Union[JobSearchResult, dict]:
+        """Vector search. ``search_type`` is ``summary``, ``job``, or ``resume``."""
+        req = ops.vsearch_jobs_request(
+            query,
+            search_type=search_type,
+            text=text,
+            job_id=job_id,
+            page=page,
+            limit=limit,
+        )
+        data = self._c._request(req)
+        return ops.parse_job_search(data, self._c, return_type)
 
     def insights(
         self, query: QueryType = None, *, return_type: Optional[Type] = None
@@ -166,6 +233,68 @@ class AsyncJobsResource:
         req = ops.export_jobs_request(query, format=format)
         data = await self._c._request(req)
         return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
+
+    async def estimate(
+        self,
+        query: QueryType = None,
+        *,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+    ) -> int:
+        req = ops.estimate_jobs_request(query, page=page, limit=limit)
+        data = await self._c._request(req)
+        return int(data["cost"])
+
+    async def expired(
+        self,
+        since: str,
+        *,
+        page: int = 1,
+        limit: int = 100,
+    ) -> dict:
+        req = ops.expired_jobs_request(since, page=page, limit=limit)
+        return await self._c._request(req)
+
+    async def export_expired(
+        self,
+        since: str,
+        *,
+        limit: Optional[int] = None,
+        notify: bool = False,
+    ) -> Task:
+        req = ops.export_expired_jobs_request(since, limit=limit, notify=notify)
+        data = await self._c._request(req)
+        return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
+
+    async def salary_benchmark(
+        self, payload: SalaryBenchmarkType = None, **fields
+    ) -> Task:
+        """Queue a posted-salary benchmark. Poll with ``client.tasks.poll``."""
+        req = ops.salary_benchmark_request(payload, **fields)
+        data = await self._c._request(req)
+        return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
+
+    async def vsearch(
+        self,
+        query: QueryType = None,
+        *,
+        search_type: str = "summary",
+        text: Optional[str] = None,
+        job_id: Optional[str] = None,
+        page: Optional[int] = None,
+        limit: Optional[int] = None,
+        return_type: Optional[Type] = None,
+    ) -> Union[JobSearchResult, dict]:
+        req = ops.vsearch_jobs_request(
+            query,
+            search_type=search_type,
+            text=text,
+            job_id=job_id,
+            page=page,
+            limit=limit,
+        )
+        data = await self._c._request(req)
+        return ops.parse_job_search(data, self._c, return_type)
 
     async def insights(
         self, query: QueryType = None, *, return_type: Optional[Type] = None

@@ -1,5 +1,4 @@
-"""Job models: the typed ``Job`` document, the ``JobQuery`` filter, and the
-paginated search result."""
+"""Job models: the typed ``Job`` document, search filters, and salary benchmarks."""
 
 from __future__ import annotations
 
@@ -8,7 +7,7 @@ from typing import List, Optional, Union
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from .base import BoundModel, ResponseModel
-from .common import Location, SalaryRange, YoeRange
+from .common import GeoFilterParams, Location, SalaryRange, YoeRange
 
 # Filter fields the API expects as the string "true" rather than a JSON bool.
 # We accept real booleans in the SDK and convert on the way out.
@@ -115,6 +114,7 @@ class JobQuery(BaseModel):
     geo_locations: Optional[List[Location]] = Field(
         default=None, validation_alias=AliasChoices("geo_locations", "locations")
     )
+    geofilter_params: Optional[GeoFilterParams] = None
     location_group: Optional[str] = None
     location_types: Optional[List[str]] = None
 
@@ -177,6 +177,65 @@ def coerce_query(query: Optional[Union[JobQuery, dict]]) -> JobQuery:
     raise TypeError(
         f"query must be a JobQuery or dict, got {type(query).__name__}"
     )
+
+
+class SalaryBenchmarkRequest(BaseModel):
+    """Body for ``POST /v2/jobs/salary-benchmark``.
+
+    Queue a posted-salary report. Poll the returned task with
+    ``client.tasks.poll``. ``public_url`` wins when both a posting URL and
+    manual fields are sent.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+    public_url: Optional[str] = None
+    job_title: Optional[str] = None
+    job_titles: Optional[List[str]] = None
+    yoe_range: Optional[YoeRange] = None
+    yoe: Optional[YoeRange] = None
+    description: Optional[str] = None
+    salary_range: Optional[SalaryRange] = None
+    geo_locations: Optional[List[Location]] = Field(
+        default=None, validation_alias=AliasChoices("geo_locations", "locations")
+    )
+    location_types: Optional[List[str]] = None
+    industry: Optional[List[str]] = None
+    experience_levels: Optional[List[str]] = None
+    days_ago: int = 90
+    notify: bool = False
+
+    def to_payload(self) -> dict:
+        """Serialize to the JSON body the API expects."""
+        raw = self.model_dump(exclude_none=True, by_alias=False)
+        if raw.get("yoe_range") is None and raw.get("yoe") is not None:
+            raw["yoe_range"] = raw.pop("yoe")
+        else:
+            raw.pop("yoe", None)
+        return raw
+
+
+def coerce_salary_benchmark(
+    payload: Optional[Union[SalaryBenchmarkRequest, dict]] = None,
+    **fields: object,
+) -> SalaryBenchmarkRequest:
+    """Normalize a dict, model, or keyword fields into a request."""
+    data: dict = {}
+    if isinstance(payload, SalaryBenchmarkRequest):
+        data.update(payload.model_dump(exclude_none=True))
+    elif payload is None:
+        pass
+    elif isinstance(payload, dict):
+        data.update(payload)
+    else:
+        raise TypeError(
+            "payload must be a SalaryBenchmarkRequest or dict, "
+            f"got {type(payload).__name__}"
+        )
+    for key, value in fields.items():
+        if value is not None:
+            data[key] = value
+    return SalaryBenchmarkRequest(**data)
 
 
 class JobSearchResult(ResponseModel):

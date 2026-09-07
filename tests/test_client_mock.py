@@ -12,7 +12,7 @@ from hirebase.exceptions import (
     error_from_response,
 )
 from hirebase.models.companies import Company
-from hirebase.models.jobs import JobSearchResult
+from hirebase.models.jobs import JobSearchResult, SalaryBenchmarkRequest
 from hirebase.models.tasks import Task
 
 
@@ -37,6 +37,105 @@ def test_jobs_export_returns_task(mock_sync_client):
     assert isinstance(task, Task)
     assert task.id == "task-1"
     assert task._client is c
+
+
+def test_jobs_estimate(mock_sync_client):
+    c = mock_sync_client
+    c.transport.add("POST", "/v2/jobs/estimate", {"cost": 42})
+    assert c.jobs.estimate({"job_titles": ["SWE"]}, limit=50) == 42
+
+
+def test_jobs_expired_feed(mock_sync_client):
+    c = mock_sync_client
+    c.transport.add(
+        "GET",
+        "/v2/jobs/expired-jobs",
+        {"jobs": [{"job_slug": "swe"}], "total_count": 1, "page": 1, "limit": 100, "total_pages": 1},
+    )
+    data = c.jobs.expired("2026-08-15")
+    assert data["total_count"] == 1
+
+
+def test_jobs_salary_benchmark_returns_task(mock_sync_client):
+    c = mock_sync_client
+    c.transport.add(
+        "POST",
+        "/v2/jobs/salary-benchmark",
+        {"id": "task-sb", "state": "queued", "type": "salary_benchmark"},
+    )
+    task = c.jobs.salary_benchmark(
+        SalaryBenchmarkRequest(
+            job_title="Senior Software Engineer",
+            yoe={"min": 5, "max": 10},
+            days_ago=90,
+        )
+    )
+    assert isinstance(task, Task)
+    assert task.id == "task-sb"
+    assert task.type == "salary_benchmark"
+    last = c.transport.calls[-1]
+    assert last.path == "/v2/jobs/salary-benchmark"
+    assert last.json["job_title"] == "Senior Software Engineer"
+    assert last.json["yoe_range"] == {"min": 5.0, "max": 10.0}
+    assert "yoe" not in last.json
+
+
+def test_async_jobs_salary_benchmark_and_poll(mock_async_client):
+    c = mock_async_client
+
+    async def run():
+        c.transport.add(
+            "POST",
+            "/v2/jobs/salary-benchmark",
+            {"id": "task-sb", "state": "queued", "type": "salary_benchmark"},
+        )
+        task = await c.jobs.salary_benchmark(
+            job_title="Senior Software Engineer",
+            geo_locations=[{"country": "United States"}],
+        )
+        assert task.id == "task-sb"
+        states = iter(["queued", "processing", "finished"])
+
+        def respond(req):
+            s = next(states)
+            return {
+                "id": "task-sb",
+                "state": s,
+                "type": "salary_benchmark",
+                "result": {"market": {"salary": {"p50": 185000, "count": 40}}}
+                if s == "finished"
+                else None,
+            }
+
+        c.transport.add("GET", "/v2/tasks/task-sb", respond)
+        ok, report = await c.tasks.poll(task, interval=0)
+        assert ok
+        assert report["market"]["salary"]["p50"] == 185000
+        await c.aclose()
+
+    asyncio.run(run())
+
+
+def test_jobs_export_expired_returns_task(mock_sync_client):
+    c = mock_sync_client
+    c.transport.add(
+        "POST", "/v2/jobs/expired-jobs/export", {"id": "task-exp", "state": "queued"}
+    )
+    task = c.jobs.export_expired("2026-08-15", limit=1000)
+    assert isinstance(task, Task)
+    assert task.id == "task-exp"
+
+
+def test_jobs_vsearch(mock_sync_client):
+    c = mock_sync_client
+    c.transport.add(
+        "POST",
+        "/v2/jobs/vsearch",
+        {"jobs": [{"_id": "1", "job_title": "SWE"}], "total_count": 1, "company_count": 1, "page": 1, "limit": 10, "total_pages": 1},
+    )
+    res = c.jobs.vsearch(text="python engineer", search_type="summary")
+    assert isinstance(res, JobSearchResult)
+    assert res.jobs[0].job_title == "SWE"
 
 
 def test_tasks_poll_success(mock_sync_client):

@@ -8,7 +8,7 @@ from typing import Any, List, Optional, Union
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from .base import BoundModel, ResponseModel
-from .common import CompanySizeRange, Location
+from .common import CompanySizeRange, FloatRange, Location
 from .jobs import Job
 
 
@@ -133,6 +133,7 @@ class CompanyQuery(BaseModel):
     hide_recruiter_agencies: Optional[bool] = None
 
     funding_types: Optional[List[str]] = None
+    mean_opinion_score: Optional[FloatRange] = None
 
     sort_by: Optional[str] = None
     sort_order: Optional[str] = None

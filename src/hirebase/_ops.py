@@ -23,7 +23,14 @@ from .models.companies import (
     coerce_company_query,
 )
 from .models.insights import JobInsights
-from .models.jobs import Job, JobQuery, JobSearchResult, coerce_query
+from .models.jobs import (
+    Job,
+    JobQuery,
+    JobSearchResult,
+    SalaryBenchmarkRequest,
+    coerce_query,
+    coerce_salary_benchmark,
+)
 from .models.neural import (
     NeuralSearchQuery,
     NeuralVectorQuery,
@@ -106,6 +113,75 @@ def export_jobs_request(
         "/v2/jobs/export",
         json={"search": q.to_payload(), "format": format},
     )
+
+
+def estimate_jobs_request(
+    query: Optional[Union[JobQuery, dict]],
+    page: Optional[int] = None,
+    limit: Optional[int] = None,
+) -> Request:
+    q = coerce_query(query)
+    if page is not None:
+        q.page = page
+    if limit is not None:
+        q.limit = limit
+    return Request("POST", "/v2/jobs/estimate", json=q.to_payload())
+
+
+def expired_jobs_request(
+    since: str,
+    *,
+    page: int = 1,
+    limit: int = 100,
+) -> Request:
+    return Request(
+        "GET",
+        "/v2/jobs/expired-jobs",
+        params={"since": since, "page": page, "limit": limit},
+    )
+
+
+def salary_benchmark_request(
+    payload: Optional[Union[SalaryBenchmarkRequest, Dict[str, Any]]] = None,
+    **fields: Any,
+) -> Request:
+    req = coerce_salary_benchmark(payload, **fields)
+    return Request("POST", "/v2/jobs/salary-benchmark", json=req.to_payload())
+
+
+def export_expired_jobs_request(
+    since: str,
+    *,
+    limit: Optional[int] = None,
+    notify: bool = False,
+) -> Request:
+    body: Dict[str, Any] = {"since": since, "notify": notify}
+    if limit is not None:
+        body["limit"] = limit
+    return Request("POST", "/v2/jobs/expired-jobs/export", json=body)
+
+
+def vsearch_jobs_request(
+    query: Optional[Union[JobQuery, dict]] = None,
+    *,
+    search_type: str = "summary",
+    text: Optional[str] = None,
+    job_id: Optional[str] = None,
+    page: Optional[int] = None,
+    limit: Optional[int] = None,
+) -> Request:
+    q = coerce_query(query)
+    if page is not None:
+        q.page = page
+    if limit is not None:
+        q.limit = limit
+    payload = q.to_payload()
+    payload["search_type"] = search_type
+    if text is not None:
+        payload["query"] = text
+    if job_id is not None:
+        payload["job_id"] = job_id
+    return Request("POST", "/v2/jobs/vsearch", json=payload)
 
 
 def insights_request(

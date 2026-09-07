@@ -2,7 +2,12 @@
 
 from hirebase import _ops as ops
 from hirebase.models.companies import CompanyQuery, coerce_company_query
-from hirebase.models.jobs import JobQuery, coerce_query
+from hirebase.models.jobs import (
+    JobQuery,
+    SalaryBenchmarkRequest,
+    coerce_query,
+    coerce_salary_benchmark,
+)
 
 
 def test_locations_alias_maps_to_geo_locations():
@@ -62,6 +67,55 @@ def test_company_query_payload():
     assert payload["industries"] == ["Tech"]
 
 
+def test_company_query_mos_range():
+    q = coerce_company_query(
+        {"mean_opinion_score": {"min": 8, "max": 10}, "sort_by": "rated"}
+    )
+    payload = q.to_payload()
+    assert payload["mean_opinion_score"] == {"min": 8.0, "max": 10.0}
+    assert payload["sort_by"] == "rated"
+
+
 def test_typed_query_objects_passthrough():
     q = JobQuery(job_titles=["Eng"], limit=5)
     assert coerce_query(q) is q
+
+
+def test_geofilter_params_on_payload():
+    q = JobQuery(
+        job_titles=["Eng"],
+        geo_locations=[{"city": "Austin", "region": "Texas", "country": "United States"}],
+        geofilter_params={"mode": "auto", "radius": 35, "unit": "mi"},
+    )
+    payload = q.to_payload()
+    assert payload["geofilter_params"] == {"mode": "auto", "radius": 35.0, "unit": "mi"}
+    assert "coordinates" not in payload["geo_locations"][0]
+
+
+def test_salary_benchmark_request_aliases_and_payload():
+    req = coerce_salary_benchmark(
+        {
+            "job_title": "Senior Software Engineer",
+            "yoe": {"min": 5, "max": 10},
+            "locations": [{"country": "United States"}],
+        }
+    )
+    payload = req.to_payload()
+    assert payload["job_title"] == "Senior Software Engineer"
+    assert payload["yoe_range"] == {"min": 5.0, "max": 10.0}
+    assert payload["geo_locations"][0]["country"] == "United States"
+    assert "yoe" not in payload
+    assert "locations" not in payload
+    assert payload["days_ago"] == 90
+
+
+def test_salary_benchmark_http_request():
+    req = ops.salary_benchmark_request(
+        SalaryBenchmarkRequest(job_title="Staff Engineer", days_ago=60),
+        notify=True,
+    )
+    assert req.method == "POST"
+    assert req.path == "/v2/jobs/salary-benchmark"
+    assert req.json["job_title"] == "Staff Engineer"
+    assert req.json["days_ago"] == 60
+    assert req.json["notify"] is True

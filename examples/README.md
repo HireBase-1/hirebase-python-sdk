@@ -36,6 +36,7 @@ https://pjreddie.com/static/resume.pdf <-- the creator of the YOLO model (AI obj
 | [07_enterprise_embed_vectors.py](./07_enterprise_embed_vectors.py) | ML / enterprise | Private embed (no storage) → vector search |
 | [08_company_hiring_intel.py](./08_company_hiring_intel.py) | Competitive intel | Company-scoped hiring insights |
 | [09_async_pipeline.py](./09_async_pipeline.py) | Platform engineers | Same search flow with `AsyncClient` |
+| [10_salary_benchmark.py](./10_salary_benchmark.py) | Comp / HR | Async `jobs.salary_benchmark` → poll the task → read the report |
 
 ## Run one example
 
@@ -48,6 +49,7 @@ python examples/01_job_board_search.py
 - **Export** (`05`) meters by job count — keep `limit` low while testing.
 - **Enterprise embed** (`07`) needs an API key with commercial embed permission; you may see 403 on a standard key.
 - **All search APIs** and **insights** may require a paid plan depending on your key.
+- **Salary benchmark** (`10`) uses `AsyncClient.jobs.salary_benchmark` then `await client.tasks.poll`. This is a metered request — keep a single run while testing.
 
 ## Need help?
 
