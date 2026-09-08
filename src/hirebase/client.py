@@ -12,6 +12,7 @@ from typing import Any, AsyncIterator, Iterator, Optional, Type, Union
 
 from . import _ops as ops
 from .config import Settings
+from .models.usage import UsageSnapshot
 from .exceptions import error_from_response
 from .resources.companies import AsyncCompaniesResource, CompaniesResource
 from .resources.jobs import AsyncJobsResource, JobsResource
@@ -50,6 +51,9 @@ class Client:
         self.tasks = TasksResource(self)
         self.resumes = ResumesResource(self)
         self.usage = UsageResource(self)
+        #: Quota snapshot from the most recent response's ``Hirebase-Usage-*``
+        #: headers (None before the first call or on un-metered endpoints).
+        self.last_usage: Optional[UsageSnapshot] = None
 
     @property
     def base_url(self) -> str:
@@ -71,6 +75,7 @@ class Client:
             kwargs["json"] = req.json
             kwargs["headers"] = {"Content-Type": "application/json"}
         resp = self._session.request(**kwargs)
+        self.last_usage = UsageSnapshot.from_headers(getattr(resp, "headers", None))
         return _handle_response(resp.status_code, resp.content, resp)
 
     def stream_file(
@@ -144,6 +149,9 @@ class AsyncClient:
         self.tasks = AsyncTasksResource(self)
         self.resumes = AsyncResumesResource(self)
         self.usage = AsyncUsageResource(self)
+        #: Quota snapshot from the most recent response's ``Hirebase-Usage-*``
+        #: headers (None before the first call or on un-metered endpoints).
+        self.last_usage: Optional[UsageSnapshot] = None
 
     @property
     def base_url(self) -> str:
@@ -163,6 +171,7 @@ class AsyncClient:
                 timeout=self._settings.timeout,
                 headers={"Content-Type": "application/json"},
             )
+        self.last_usage = UsageSnapshot.from_headers(getattr(resp, "headers", None))
         return _handle_response(resp.status_code, resp.content, resp)
 
     async def stream_file(
@@ -219,7 +228,9 @@ def _decode_body(content: bytes) -> Any:
 
 def _handle_response(status_code: int, content: bytes, _resp: Any) -> Any:
     if status_code >= 400:
-        raise error_from_response(status_code, _decode_body(content))
+        raise error_from_response(
+            status_code, _decode_body(content), getattr(_resp, "headers", None)
+        )
     if status_code == 204 or not content:
         return None
     return _decode_body(content)

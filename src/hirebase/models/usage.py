@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List, Optional, Union
+from typing import Any, List, Mapping, Optional, Union
+
+from pydantic import BaseModel
 
 from .base import BoundModel, ResponseModel
 
@@ -54,3 +56,74 @@ class UsageSummary(BoundModel):
             if row.event_name == key:
                 return row
         return None
+
+
+_USAGE_PREFIX = "hirebase-usage-"
+
+
+def _to_int(value: Optional[str]) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+class UsageSnapshot(BaseModel):
+    """Quota state stamped on every metered response (``Hirebase-Usage-*``).
+
+    Read it from ``client.last_usage`` after any call, or from
+    ``QuotaExceededError.usage`` when a call is refused at the cap. It lets
+    you stay under quota without polling ``client.usage.get()``.
+    """
+
+    meter: Optional[str] = None
+    feature: Optional[str] = None
+    unit: Optional[str] = None
+    included_limit: Optional[int] = None
+    included_used: Optional[int] = None
+    included_remaining: Optional[int] = None
+    overage_used: int = 0
+    overage_mode: Optional[str] = None
+    total_used: Optional[int] = None
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None
+    billing_code: Optional[str] = None
+    retry_after: Optional[int] = None
+
+    @property
+    def is_blocked(self) -> bool:
+        """True when the API refused the call because the cap was reached."""
+        return self.billing_code == "limit_exceeded"
+
+    @property
+    def is_meter_mode(self) -> bool:
+        """True when usage past the allowance is billed instead of refused."""
+        return self.overage_mode == "meter"
+
+    @classmethod
+    def from_headers(cls, headers: Optional[Mapping[str, Any]]) -> Optional["UsageSnapshot"]:
+        """Build a snapshot from response headers; None if no usage headers."""
+        if not headers:
+            return None
+        lowered = {str(k).lower(): v for k, v in headers.items()}
+        usage = {k[len(_USAGE_PREFIX):]: v for k, v in lowered.items() if k.startswith(_USAGE_PREFIX)}
+        billing_code = lowered.get("x-billing-code")
+        if not usage and billing_code is None:
+            return None
+        return cls(
+            meter=usage.get("meter"),
+            feature=usage.get("feature"),
+            unit=usage.get("unit"),
+            included_limit=_to_int(usage.get("included-limit")),
+            included_used=_to_int(usage.get("included-used")),
+            included_remaining=_to_int(usage.get("included-remaining")),
+            overage_used=_to_int(usage.get("overage-used")) or 0,
+            overage_mode=usage.get("overage-mode"),
+            total_used=_to_int(usage.get("total-used")),
+            period_start=usage.get("period-start"),
+            period_end=usage.get("period-end"),
+            billing_code=billing_code,
+            retry_after=_to_int(lowered.get("retry-after")),
+        )
