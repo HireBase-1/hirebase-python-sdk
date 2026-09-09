@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, AsyncIterator, Iterator, Optional, Type, Union
+from typing import Any, AsyncIterator, Iterator, Optional, Tuple, Type, Union
 
 from . import _ops as ops
 from .config import Settings
-from .models.usage import UsageSnapshot
+from .models.usage import ResponseMeta
 from .exceptions import error_from_response
 from .resources.companies import AsyncCompaniesResource, CompaniesResource
 from .resources.jobs import AsyncJobsResource, JobsResource
@@ -51,9 +51,6 @@ class Client:
         self.tasks = TasksResource(self)
         self.resumes = ResumesResource(self)
         self.usage = UsageResource(self)
-        #: Quota snapshot from the most recent response's ``Hirebase-Usage-*``
-        #: headers (None before the first call or on un-metered endpoints).
-        self.last_usage: Optional[UsageSnapshot] = None
 
     @property
     def base_url(self) -> str:
@@ -63,6 +60,15 @@ class Client:
         return f"{self._settings.base_url}{path}"
 
     def _request(self, req: ops.Request) -> Any:
+        """Send ``req`` and return the decoded body."""
+        return self._request_meta(req)[0]
+
+    def _request_meta(self, req: ops.Request) -> Tuple[Any, ResponseMeta]:
+        """Send ``req``; return ``(decoded_body, ResponseMeta)``.
+
+        Resource methods call this when ``return_meta=True`` so callers get the
+        ``Hirebase-Usage-*`` quota snapshot for that exact call.
+        """
         kwargs: dict = {
             "method": req.method,
             "url": self._url(req.path),
@@ -75,8 +81,8 @@ class Client:
             kwargs["json"] = req.json
             kwargs["headers"] = {"Content-Type": "application/json"}
         resp = self._session.request(**kwargs)
-        self.last_usage = UsageSnapshot.from_headers(getattr(resp, "headers", None))
-        return _handle_response(resp.status_code, resp.content, resp)
+        data = _handle_response(resp.status_code, resp.content, resp)
+        return data, ResponseMeta.from_response(resp)
 
     def stream_file(
         self, url: str, *, file_path: str, chunk_size: int = _DOWNLOAD_CHUNK
@@ -149,15 +155,17 @@ class AsyncClient:
         self.tasks = AsyncTasksResource(self)
         self.resumes = AsyncResumesResource(self)
         self.usage = AsyncUsageResource(self)
-        #: Quota snapshot from the most recent response's ``Hirebase-Usage-*``
-        #: headers (None before the first call or on un-metered endpoints).
-        self.last_usage: Optional[UsageSnapshot] = None
 
     @property
     def base_url(self) -> str:
         return self._settings.base_url
 
     async def _request(self, req: ops.Request) -> Any:
+        """Send ``req`` and return the decoded body."""
+        return (await self._request_meta(req))[0]
+
+    async def _request_meta(self, req: ops.Request) -> Tuple[Any, ResponseMeta]:
+        """Send ``req``; return ``(decoded_body, ResponseMeta)``."""
         if req.files is not None:
             resp = await self._http.request(
                 req.method, req.path, params=req.params, files=req.files, timeout=self._settings.timeout
@@ -171,8 +179,8 @@ class AsyncClient:
                 timeout=self._settings.timeout,
                 headers={"Content-Type": "application/json"},
             )
-        self.last_usage = UsageSnapshot.from_headers(getattr(resp, "headers", None))
-        return _handle_response(resp.status_code, resp.content, resp)
+        data = _handle_response(resp.status_code, resp.content, resp)
+        return data, ResponseMeta.from_response(resp)
 
     async def stream_file(
         self, url: str, *, file_path: str, chunk_size: int = _DOWNLOAD_CHUNK

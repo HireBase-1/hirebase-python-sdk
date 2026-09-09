@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, List, Mapping, Optional, Union
+from typing import Any, Dict, List, Mapping, Optional, Union
 
 from pydantic import BaseModel
 
@@ -73,9 +73,10 @@ def _to_int(value: Optional[str]) -> Optional[int]:
 class UsageSnapshot(BaseModel):
     """Quota state stamped on every metered response (``Hirebase-Usage-*``).
 
-    Read it from ``client.last_usage`` after any call, or from
-    ``QuotaExceededError.usage`` when a call is refused at the cap. It lets
-    you stay under quota without polling ``client.usage.get()``.
+    Read it from ``meta.usage`` after calling any resource method with
+    ``return_meta=True``, or from ``QuotaExceededError.usage`` when a call is
+    refused at the cap. It lets you stay under quota without polling
+    ``client.usage.get()``.
     """
 
     meter: Optional[str] = None
@@ -126,4 +127,39 @@ class UsageSnapshot(BaseModel):
             period_end=usage.get("period-end"),
             billing_code=billing_code,
             retry_after=_to_int(lowered.get("retry-after")),
+        )
+
+
+class ResponseMeta(BaseModel):
+    """Transport-level metadata for one API call.
+
+    Returned alongside the parsed body when a resource method is called with
+    ``return_meta=True``::
+
+        jobs, meta = client.jobs.search(query, limit=50, return_meta=True)
+        if meta.usage and meta.usage.included_remaining is not None:
+            print("jobs left this period:", meta.usage.included_remaining)
+
+    ``usage`` is ``None`` on un-metered endpoints. ``headers`` keys are
+    lower-cased.
+    """
+
+    status_code: int
+    headers: Dict[str, str]
+    usage: Optional[UsageSnapshot] = None
+
+    @property
+    def request_id(self) -> Optional[str]:
+        """The server's ``X-Request-Id`` when present (handy for support)."""
+        return self.headers.get("x-request-id")
+
+    @classmethod
+    def from_response(cls, resp: Any) -> "ResponseMeta":
+        """Build from a ``requests``/``httpx`` response (or any look-alike)."""
+        raw = getattr(resp, "headers", None) or {}
+        headers = {str(k).lower(): str(v) for k, v in raw.items()}
+        return cls(
+            status_code=int(getattr(resp, "status_code", 0) or 0),
+            headers=headers,
+            usage=UsageSnapshot.from_headers(headers),
         )

@@ -1,4 +1,4 @@
-"""``Hirebase-Usage-*`` header parsing, ``client.last_usage`` and the
+"""``Hirebase-Usage-*`` header parsing, per-call ``return_meta=True`` and the
 quota-vs-rate-limit 429 split (no network)."""
 from types import SimpleNamespace
 
@@ -7,7 +7,7 @@ import pytest
 import hirebase
 from hirebase.client import _handle_response
 from hirebase.exceptions import QuotaExceededError, RateLimitError, error_from_response
-from hirebase.models.usage import UsageSnapshot
+from hirebase.models.usage import ResponseMeta, UsageSnapshot
 
 QUOTA_HEADERS = {
     "Hirebase-Usage-Feature": "jobs_api",
@@ -23,6 +23,16 @@ QUOTA_HEADERS = {
     "Hirebase-Usage-Period-End": "2026-09-30T23:59:59Z",
     "X-Billing-Code": "limit_exceeded",
 }
+
+OK_HEADERS = {
+    **QUOTA_HEADERS,
+    "Hirebase-Usage-Included-Used": "12",
+    "Hirebase-Usage-Included-Remaining": "488",
+    "Hirebase-Usage-Overage-Used": "0",
+    "Hirebase-Usage-Total-Used": "12",
+    "X-Request-Id": "req_abc123",
+}
+OK_HEADERS.pop("X-Billing-Code")
 
 
 def test_snapshot_from_headers_is_case_insensitive():
@@ -46,6 +56,19 @@ def test_snapshot_absent_without_usage_headers():
 def test_snapshot_tolerates_bad_numbers():
     snap = UsageSnapshot.from_headers({"Hirebase-Usage-Meter": "m_jobs_api_calls", "Hirebase-Usage-Total-Used": "n/a"})
     assert snap is not None and snap.total_used is None and snap.overage_used == 0
+
+
+def test_response_meta_from_response_lowercases_headers_and_parses_usage():
+    meta = ResponseMeta.from_response(SimpleNamespace(status_code=200, headers=OK_HEADERS))
+    assert meta.status_code == 200
+    assert meta.request_id == "req_abc123"
+    assert meta.headers["hirebase-usage-meter"] == "m_jobs_api_calls"
+    assert meta.usage is not None and meta.usage.included_remaining == 488
+
+
+def test_response_meta_without_usage_headers():
+    meta = ResponseMeta.from_response(SimpleNamespace(status_code=200, headers={"Content-Type": "application/json"}))
+    assert meta.usage is None and meta.request_id is None
 
 
 def test_quota_429_maps_to_quota_exceeded_error():
@@ -78,48 +101,92 @@ def test_handle_response_passes_headers_to_error():
     assert info.value.usage.is_blocked
 
 
-def test_client_last_usage_updates_per_call(monkeypatch):
+def _sync_client_with_responses(monkeypatch, responses):
     client = hirebase.Client(api_key="test-key", base_url="https://api.test")
-    ok_headers = {**QUOTA_HEADERS, "Hirebase-Usage-Included-Used": "12", "Hirebase-Usage-Included-Remaining": "488",
-                  "Hirebase-Usage-Overage-Used": "0", "Hirebase-Usage-Total-Used": "12"}
-    ok_headers.pop("X-Billing-Code")
+    monkeypatch.setattr(client._session, "request", lambda **kwargs: responses.pop(0))
+    return client
+
+
+def test_return_meta_gives_per_call_usage(monkeypatch):
     responses = [
-        SimpleNamespace(status_code=200, content=b'{"jobs": [], "total_count": 0}', headers=ok_headers),
+        SimpleNamespace(status_code=200, content=b'{"jobs": [], "total_count": 0}', headers=OK_HEADERS),
         SimpleNamespace(status_code=429, content=b'{"detail": "cap"}', headers=QUOTA_HEADERS),
         SimpleNamespace(status_code=200, content=b'{"ok": true}', headers={"Content-Type": "application/json"}),
     ]
-    monkeypatch.setattr(client._session, "request", lambda **kwargs: responses.pop(0))
+    client = _sync_client_with_responses(monkeypatch, responses)
 
-    assert client.last_usage is None
-    client.jobs.search({"job_titles": ["SWE"]}, return_type=dict)
-    assert client.last_usage.included_remaining == 488 and not client.last_usage.is_blocked
+    result, meta = client.jobs.search({"job_titles": ["SWE"]}, return_type=dict, return_meta=True)
+    assert result == {"jobs": [], "total_count": 0}
+    assert isinstance(meta, ResponseMeta)
+    assert meta.status_code == 200 and meta.request_id == "req_abc123"
+    assert meta.usage.included_remaining == 488 and not meta.usage.is_blocked
 
-    with pytest.raises(QuotaExceededError):
-        client.jobs.search({"job_titles": ["SWE"]})
-    assert client.last_usage.is_blocked and client.last_usage.total_used == 503
+    # A refused call still raises; the snapshot rides on the error.
+    with pytest.raises(QuotaExceededError) as info:
+        client.jobs.search({"job_titles": ["SWE"]}, return_meta=True)
+    assert info.value.usage.is_blocked and info.value.usage.total_used == 503
 
-    client.jobs.search({"job_titles": ["SWE"]}, return_type=dict)
-    assert client.last_usage is None  # un-metered response clears it
+    # Un-metered response: meta is present, usage is None.
+    _, meta2 = client.jobs.search({"job_titles": ["SWE"]}, return_type=dict, return_meta=True)
+    assert meta2.usage is None
 
 
-def test_async_client_last_usage(monkeypatch):
+def test_default_return_shape_is_unchanged(monkeypatch):
+    responses = [
+        SimpleNamespace(status_code=200, content=b'{"jobs": [], "total_count": 0}', headers=OK_HEADERS),
+        SimpleNamespace(status_code=200, content=b'{"cost": 7}', headers=OK_HEADERS),
+    ]
+    client = _sync_client_with_responses(monkeypatch, responses)
+    assert client.jobs.search({"job_titles": ["SWE"]}, return_type=dict) == {"jobs": [], "total_count": 0}
+    assert client.jobs.estimate({"job_titles": ["SWE"]}) == 7
+
+
+def test_return_meta_on_other_metered_methods(monkeypatch):
+    responses = [
+        SimpleNamespace(status_code=200, content=b'{"cost": 7}', headers=OK_HEADERS),
+        SimpleNamespace(status_code=200, content=b'{"companies": [], "total_count": 0}', headers=OK_HEADERS),
+    ]
+    client = _sync_client_with_responses(monkeypatch, responses)
+    cost, meta = client.jobs.estimate({"job_titles": ["SWE"]}, return_meta=True)
+    assert cost == 7 and meta.usage.included_used == 12
+    companies, meta2 = client.companies.search({"industries": ["Software"]}, return_type=dict, return_meta=True)
+    assert companies["companies"] == [] and meta2.status_code == 200
+
+
+def test_client_no_longer_keeps_last_usage_state():
+    client = hirebase.Client(api_key="test-key", base_url="https://api.test")
+    assert not hasattr(client, "last_usage")
+    aclient = hirebase.AsyncClient(api_key="test-key", base_url="https://api.test")
+    assert not hasattr(aclient, "last_usage")
+
+
+def test_mock_transport_default_path_still_works(mock_sync_client):
+    """Tests that stub ``_request`` keep working for the default (no-meta) path."""
+    mock_sync_client.transport.add("POST", "/v2/jobs/search", {"jobs": [], "total_count": 0})
+    assert mock_sync_client.jobs.search({"job_titles": ["SWE"]}, return_type=dict) == {"jobs": [], "total_count": 0}
+
+
+def test_async_return_meta(monkeypatch):
     import asyncio
 
     client = hirebase.AsyncClient(api_key="test-key", base_url="https://api.test")
 
     async def fake_request(*args, **kwargs):
-        return SimpleNamespace(status_code=200, content=b'{"jobs": []}', headers=QUOTA_HEADERS)
+        return SimpleNamespace(status_code=200, content=b'{"jobs": []}', headers=OK_HEADERS)
 
     monkeypatch.setattr(client._http, "request", fake_request)
 
     async def run():
-        await client.jobs.search({"job_titles": ["SWE"]}, return_type=dict)
-        return client.last_usage
+        plain = await client.jobs.search({"job_titles": ["SWE"]}, return_type=dict)
+        result, meta = await client.jobs.search({"job_titles": ["SWE"]}, return_type=dict, return_meta=True)
+        return plain, result, meta
 
-    snap = asyncio.run(run())
-    assert snap is not None and snap.total_used == 503
+    plain, result, meta = asyncio.run(run())
+    assert plain == {"jobs": []} and result == {"jobs": []}
+    assert meta.usage is not None and meta.usage.total_used == 12
 
 
 def test_exports():
     assert hirebase.QuotaExceededError is QuotaExceededError
     assert hirebase.UsageSnapshot is UsageSnapshot
+    assert hirebase.ResponseMeta is ResponseMeta

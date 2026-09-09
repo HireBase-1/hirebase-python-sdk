@@ -29,7 +29,7 @@ Quickstart:
 
 from ._version import __version__
 from .client import AsyncClient, Client
-from .models.usage import UsageSnapshot
+from .models.usage import ResponseMeta, UsageSnapshot
 from .config import DEFAULT_BASE_URL, Settings
 from .exceptions import (
     APIError,
@@ -109,6 +109,7 @@ __all__ = [
     "RateLimitError",
     "QuotaExceededError",
     "UsageSnapshot",
+    "ResponseMeta",
     "ServerError",
     "TaskError",
     "TaskFailed",

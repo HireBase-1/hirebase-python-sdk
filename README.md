@@ -233,16 +233,20 @@ except hirebase.APIError as e:
 
 ## Tracking quota without polling
 
-Every metered response carries `Hirebase-Usage-*` headers. The client keeps the
-latest snapshot on `client.last_usage` (also on `AsyncClient`):
+Every metered response carries `Hirebase-Usage-*` headers. Pass
+`return_meta=True` to any metered method (jobs and companies, sync or async)
+to get them back with the result as a `ResponseMeta`:
 
 ```python
-result = client.jobs.search({"job_titles": ["Software Engineer"]}, limit=50)
-usage = client.last_usage
+jobs, meta = client.jobs.search({"job_titles": ["Software Engineer"]}, limit=50, return_meta=True)
+usage = meta.usage                      # None on un-metered endpoints
 print(usage.meter, usage.total_used, "/", usage.included_limit, "remaining:", usage.included_remaining)
 if usage.is_meter_mode and usage.overage_used:
     print("billing overage units:", usage.overage_used)
+print(meta.status_code, meta.request_id)  # transport details for the same call
 ```
+
+Without the flag the return shape is unchanged, so existing code keeps working.
 
 When a block-mode plan is at its cap the API refuses the call with a 429 that
 is **not** a rate limit, so backing off will not help:
