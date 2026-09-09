@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, AsyncIterator, Iterator, Optional, Type, Union
+from typing import Any, AsyncIterator, Iterator, Optional, Tuple, Type, Union
 
 from . import _ops as ops
 from .config import Settings
+from .models.usage import ResponseMeta
 from .exceptions import error_from_response
 from .resources.companies import AsyncCompaniesResource, CompaniesResource
 from .resources.jobs import AsyncJobsResource, JobsResource
@@ -59,6 +60,15 @@ class Client:
         return f"{self._settings.base_url}{path}"
 
     def _request(self, req: ops.Request) -> Any:
+        """Send ``req`` and return the decoded body."""
+        return self._request_meta(req)[0]
+
+    def _request_meta(self, req: ops.Request) -> Tuple[Any, ResponseMeta]:
+        """Send ``req``; return ``(decoded_body, ResponseMeta)``.
+
+        Resource methods call this when ``return_meta=True`` so callers get the
+        ``Hirebase-Usage-*`` quota snapshot for that exact call.
+        """
         kwargs: dict = {
             "method": req.method,
             "url": self._url(req.path),
@@ -71,7 +81,8 @@ class Client:
             kwargs["json"] = req.json
             kwargs["headers"] = {"Content-Type": "application/json"}
         resp = self._session.request(**kwargs)
-        return _handle_response(resp.status_code, resp.content, resp)
+        data = _handle_response(resp.status_code, resp.content, resp)
+        return data, ResponseMeta.from_response(resp)
 
     def stream_file(
         self, url: str, *, file_path: str, chunk_size: int = _DOWNLOAD_CHUNK
@@ -150,6 +161,11 @@ class AsyncClient:
         return self._settings.base_url
 
     async def _request(self, req: ops.Request) -> Any:
+        """Send ``req`` and return the decoded body."""
+        return (await self._request_meta(req))[0]
+
+    async def _request_meta(self, req: ops.Request) -> Tuple[Any, ResponseMeta]:
+        """Send ``req``; return ``(decoded_body, ResponseMeta)``."""
         if req.files is not None:
             resp = await self._http.request(
                 req.method, req.path, params=req.params, files=req.files, timeout=self._settings.timeout
@@ -163,7 +179,8 @@ class AsyncClient:
                 timeout=self._settings.timeout,
                 headers={"Content-Type": "application/json"},
             )
-        return _handle_response(resp.status_code, resp.content, resp)
+        data = _handle_response(resp.status_code, resp.content, resp)
+        return data, ResponseMeta.from_response(resp)
 
     async def stream_file(
         self, url: str, *, file_path: str, chunk_size: int = _DOWNLOAD_CHUNK
@@ -219,7 +236,9 @@ def _decode_body(content: bytes) -> Any:
 
 def _handle_response(status_code: int, content: bytes, _resp: Any) -> Any:
     if status_code >= 400:
-        raise error_from_response(status_code, _decode_body(content))
+        raise error_from_response(
+            status_code, _decode_body(content), getattr(_resp, "headers", None)
+        )
     if status_code == 204 or not content:
         return None
     return _decode_body(content)
