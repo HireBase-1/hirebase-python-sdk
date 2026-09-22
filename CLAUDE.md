@@ -33,7 +33,7 @@ Before changing a feature, endpoint, or workflow, try to understand:
 * relevant performance, cost, scale, or accuracy tradeoffs
 
 Use the codebase to investigate this when necessary. Look at callers, routes, tests, documentation, frontend usage, comments, schemas, and related implementations.
-A limitation or inconsistency is not automatically a bug. Some functionality is intentionally narrow. For example: vector search exists primarily to support similar-job retrieval. It is not intended to be a full replacement for standard job search and is not publicly positioned as supporting all normal search functionality. Missing parity with normal search, such as support for every filter, is not automatically a bug. Understand the intended use case before expanding behavior.
+A limitation or inconsistency is not automatically a bug. Some functionality is intentionally narrow. For example: the expired-jobs feed returns identifiers only and costs nothing; the missing job bodies are deliberate, not a gap to fill. Understand the intended use case before expanding behavior.
 
 ### Make the smallest useful change
 
@@ -87,7 +87,7 @@ Do not add expensive processing unless the expected improvement justifies the co
 * **hirebase-web** — the marketing site at www.hirebase.org. The public API docs at www.hirebase.org/docs are Mintlify, published from the `mint` branch of hirebase-api.
 * **hirebase-python-sdk** — the public Python client for the API.
 * **hirebase-ats-detector** — detects which applicant tracking system a company uses, feeding scraping coverage.
-* The job corpus, standard search, vector search, and scraping live in the private `jolby_dsde` package; async work such as exports runs through the private `hirebase_cloud` task service. Look there before concluding that search or scrape behavior is missing from a repo.
+* The job corpus, standard search, semantic (neural/vector) search, and scraping live in the private `jolby_dsde` package; async work such as exports runs through the private `hirebase_cloud` task service. Look there before concluding that search or scrape behavior is missing from a repo.
 
 Cross-cutting product rules:
 
@@ -95,11 +95,12 @@ Cross-cutting product rules:
 * **If an endpoint is not in the public docs, treat it as nonexistent.** Remove it rather than fix or enable it.
 * **Two billing systems coexist.** Users are `legacy` or `stripe_v2`. Legacy is being sunset, not extended; migrate users off it rather than improving it. The Stripe catalog (`catalog/` in hirebase-api) is the single source of truth for products, prices, features, and meters. Stripe is never edited by hand.
 * **HireScout** (`/v2/hirescout`, www.hirescout.org) is a dead product. Do not extend it or treat it as a reference for how Hirebase should work.
+* **Vector search is non-public.** `POST /v2/jobs/vsearch` was removed from the docs in September 2026 because Neural Search (`POST /v2/jobs/neural-search`) is better for every use it had: free text via `vector.query`, similar jobs via `vector.job_ids`, resume matching via `vector.artifact_id`, plus lexical filters. Do not document, promote, or extend vsearch; steer customers and the SDK to Neural Search. The route still exists only because the web app calls it.
 
 ### Product memory
 
 Maintain this file as you learn important things about how Hirebase is intended to work. Useful things to preserve: the purpose of important features, primary customer use cases, deliberate limitations, important non-goals, architectural tradeoffs, decisions Spencer or John explain, and mistakes or assumptions future Claude sessions are likely to repeat.
-Capture the underlying principle rather than the specific incident. Bad: "Do not add location filters to vector search." Better: "Vector search primarily exists for similar-job retrieval and is not intended to have feature parity with standard search."
+Capture the underlying principle rather than the specific incident. Bad: "Remove the vsearch docs page." Better: "Vector search is non-public; Neural Search is the one supported semantic endpoint."
 Put cross-repo knowledge in the shared section (and copy it to the other repos); put repo-only knowledge under **This repo**. Use restraint. Do not add temporary task details, obvious facts easily discovered from code, speculative conclusions, minor implementation details, or every correction you receive. If you are uncertain whether something represents a durable product decision, ask before treating it as one.
 
 ### Working style
