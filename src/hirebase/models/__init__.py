@@ -17,7 +17,7 @@ from .common import (
     SalaryRange,
     YoeRange,
 )
-from .jobs import Job, JobQuery, JobSearchResult, SalaryBenchmarkRequest
+from .jobs import ContactRevealRequest, Job, JobContactsRequest, JobQuery, JobSearchResult, SalaryBenchmarkRequest
 from .companies import (
     Company,
     CompanyFunding,
@@ -44,6 +44,8 @@ __all__ = [
     "JobQuery",
     "JobSearchResult",
     "SalaryBenchmarkRequest",
+    "JobContactsRequest",
+    "ContactRevealRequest",
     "Company",
     "CompanyQuery",
     "CompanySearchResult",

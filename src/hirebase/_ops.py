@@ -30,6 +30,10 @@ from .models.jobs import (
     SalaryBenchmarkRequest,
     coerce_query,
     coerce_salary_benchmark,
+    coerce_job_contacts,
+    coerce_contact_reveal,
+    JobContactsRequest,
+    ContactRevealRequest,
 )
 from .models.neural import (
     NeuralSearchQuery,
@@ -147,6 +151,22 @@ def salary_benchmark_request(
 ) -> Request:
     req = coerce_salary_benchmark(payload, **fields)
     return Request("POST", "/v2/jobs/salary-benchmark", json=req.to_payload())
+
+
+def job_contacts_request(
+    payload: Optional[Union[JobContactsRequest, Dict[str, Any], str]] = None,
+    **fields: Any,
+) -> Request:
+    req = coerce_job_contacts(payload, **fields)
+    return Request("POST", "/v2/jobs/contacts", json=req.to_payload())
+
+
+def contact_reveal_request(
+    payload: Optional[Union[ContactRevealRequest, Dict[str, Any], str]] = None,
+    **fields: Any,
+) -> Request:
+    req = coerce_contact_reveal(payload, **fields)
+    return Request("POST", "/v2/contacts/reveal", json=req.to_payload())
 
 
 def export_expired_jobs_request(
