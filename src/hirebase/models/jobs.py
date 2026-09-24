@@ -201,8 +201,10 @@ class SalaryBenchmarkRequest(BaseModel):
     )
     location_types: Optional[List[str]] = None
     industry: Optional[List[str]] = None
+    sub_industry: Optional[List[str]] = None
     experience_levels: Optional[List[str]] = None
     days_ago: int = 90
+    include_expired: bool = True
     notify: bool = False
 
     def to_payload(self) -> dict:
