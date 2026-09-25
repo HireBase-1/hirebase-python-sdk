@@ -80,6 +80,8 @@ For job data:
 
 Do not add expensive processing unless the expected improvement justifies the cost.
 
+**Shape data where it is produced.** Read endpoints (for example `GET /v2/tasks/{id}`) return stored data as-is. To change what callers get, change what the producer (worker, report builder, ingest) stores. If data should not be exposed, do not store it. A filter in one read path misses every other path to the same data (task callbacks, list endpoints, exports) and leaves two versions of the truth. If a fix seems to need web and API callers to see different data, ask first; do not add the split on your own.
+
 ### The Hirebase system
 
 * **hirebase-api** — FastAPI backend at api.hirebase.org. Serves both the web app and API-key customers. `develop` deploys dev, `main` deploys prod.
