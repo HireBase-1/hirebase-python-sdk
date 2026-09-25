@@ -254,6 +254,40 @@ def test_missing_api_key_raises(monkeypatch):
         hirebase.Client()
 
 
+def test_jobs_contacts_returns_task_and_sends_flags(mock_sync_client):
+    c = mock_sync_client
+    c.transport.add("POST", "/v2/jobs/contacts", {"id": "task-c", "state": "queued", "type": "contacts_extraction"})
+    task = c.jobs.contacts("6ab32db8f1c329e432f72994", reveal_email=True)
+    assert isinstance(task, Task) and task.id == "task-c"
+    sent = c.transport.calls[-1]
+    assert sent.json == {"job_id": "6ab32db8f1c329e432f72994", "reveal_email": True, "reveal_phone": False}
+
+
+def test_jobs_reveal_contact_returns_task(mock_sync_client):
+    c = mock_sync_client
+    c.transport.add("POST", "/v2/contacts/reveal", {"id": "task-r", "state": "queued", "type": "enrich_contact"})
+    task = c.jobs.reveal_contact("https://www.linkedin.com/in/drew-bratcher-b8a9283a", name="Drew Bratcher", reveal_phone=True)
+    assert task.id == "task-r"
+    sent = c.transport.calls[-1]
+    assert sent.json == {
+        "linkedin_url": "https://www.linkedin.com/in/drew-bratcher-b8a9283a",
+        "name": "Drew Bratcher",
+        "reveal_email": True,
+        "reveal_phone": True,
+    }
+
+
+def test_async_jobs_contacts(mock_async_client):
+    c = mock_async_client
+    c.transport.add("POST", "/v2/jobs/contacts", {"id": "task-ca", "state": "queued", "type": "contacts_extraction"})
+
+    async def run():
+        return await c.jobs.contacts({"job_id": "abc", "reveal_phone": True})
+
+    task = asyncio.run(run())
+    assert task.id == "task-ca"
+
+
 def test_jobs_historical_search(mock_sync_client):
     c = mock_sync_client
     c.transport.add(

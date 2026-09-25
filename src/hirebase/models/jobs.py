@@ -259,3 +259,78 @@ class JobSearchResult(ResponseModel):
 
     def __getitem__(self, index):
         return self.jobs[index]
+
+
+class JobContactsRequest(BaseModel):
+    """Body for ``POST /v2/jobs/contacts`` (Hiring Manager Contacts API).
+
+    Queue research for the likely hiring managers and recruiters behind one
+    posting. Poll the returned task with ``client.tasks.poll``; the result
+    holds ``contacts`` (name, role, LinkedIn ``profile_url``) and, when
+    requested, ``email`` / ``email_status`` / ``phone_number`` per contact plus
+    ``reveals`` counts. Reveals cost extra and are billed only when found.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    job_id: str
+    reveal_email: bool = False
+    reveal_phone: bool = False
+
+    def to_payload(self) -> dict:
+        return self.model_dump(exclude_none=True)
+
+
+class ContactRevealRequest(BaseModel):
+    """Body for ``POST /v2/contacts/reveal``.
+
+    Reveal a work email and/or direct phone number for one contact you
+    already have, by LinkedIn profile URL. Poll the returned task with
+    ``client.tasks.poll``. Billed per value actually found.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    linkedin_url: str
+    name: Optional[str] = None
+    reveal_email: bool = True
+    reveal_phone: bool = False
+
+    def to_payload(self) -> dict:
+        return self.model_dump(exclude_none=True)
+
+
+def coerce_job_contacts(
+    payload: Optional[Union[JobContactsRequest, dict, str]] = None, **fields: object
+) -> JobContactsRequest:
+    """Accept a job id string, a dict, a model, or keyword fields."""
+    if isinstance(payload, JobContactsRequest):
+        data = payload.model_dump(exclude_none=True)
+    elif isinstance(payload, str):
+        data = {"job_id": payload}
+    elif isinstance(payload, dict):
+        data = dict(payload)
+    elif payload is None:
+        data = {}
+    else:
+        raise TypeError(f"payload must be a JobContactsRequest, dict or job id, got {type(payload).__name__}")
+    data.update({k: v for k, v in fields.items() if v is not None})
+    return JobContactsRequest(**data)
+
+
+def coerce_contact_reveal(
+    payload: Optional[Union[ContactRevealRequest, dict, str]] = None, **fields: object
+) -> ContactRevealRequest:
+    """Accept a LinkedIn URL string, a dict, a model, or keyword fields."""
+    if isinstance(payload, ContactRevealRequest):
+        data = payload.model_dump(exclude_none=True)
+    elif isinstance(payload, str):
+        data = {"linkedin_url": payload}
+    elif isinstance(payload, dict):
+        data = dict(payload)
+    elif payload is None:
+        data = {}
+    else:
+        raise TypeError(f"payload must be a ContactRevealRequest, dict or LinkedIn URL, got {type(payload).__name__}")
+    data.update({k: v for k, v in fields.items() if v is not None})
+    return ContactRevealRequest(**data)

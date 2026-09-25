@@ -24,7 +24,14 @@ from typing import (
 )
 
 from .. import _ops as ops
-from ..models.jobs import Job, JobQuery, JobSearchResult, SalaryBenchmarkRequest
+from ..models.jobs import (
+    ContactRevealRequest,
+    Job,
+    JobContactsRequest,
+    JobQuery,
+    JobSearchResult,
+    SalaryBenchmarkRequest,
+)
 from ..models.neural import NeuralSearchQuery, NeuralVectorQuery, coerce_neural_search
 from ..models.insights import JobInsights
 from ..models.tasks import Task
@@ -241,6 +248,44 @@ class JobsResource:
         )
 
     # ── semantic search ─────────────────────────────────────────────────
+
+    def contacts(
+        self,
+        job_id: Union[str, JobContactsRequest, dict],
+        *,
+        reveal_email: Optional[bool] = None,
+        reveal_phone: Optional[bool] = None,
+    ) -> Task:
+        """Queue hiring-manager / recruiter research for a posting.
+
+        Poll with ``client.tasks.poll``; ``task.result["contacts"]`` holds
+        name, role and LinkedIn ``profile_url``. ``reveal_email`` /
+        ``reveal_phone`` add a work email / direct phone per contact (extra
+        cost, billed only when found). Requires the ``hiring_manager_api``
+        feature on your key.
+        """
+        req = ops.job_contacts_request(job_id, reveal_email=reveal_email, reveal_phone=reveal_phone)
+        data = self._c._request(req)
+        return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
+
+    def reveal_contact(
+        self,
+        linkedin_url: Union[str, ContactRevealRequest, dict],
+        *,
+        name: Optional[str] = None,
+        reveal_email: Optional[bool] = None,
+        reveal_phone: Optional[bool] = None,
+    ) -> Task:
+        """Reveal a work email and/or phone number for one contact by LinkedIn URL.
+
+        Poll with ``client.tasks.poll``; the result is the contact with
+        ``email``, ``email_status``, ``phone_number`` and ``reveals`` counts.
+        """
+        req = ops.contact_reveal_request(
+            linkedin_url, name=name, reveal_email=reveal_email, reveal_phone=reveal_phone
+        )
+        data = self._c._request(req)
+        return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
 
     def vsearch(
         self,
@@ -522,6 +567,33 @@ class AsyncJobsResource:
         return await self._call(
             req, lambda d: ops.parse_task(d, self._c, None), return_meta
         )
+
+    async def contacts(
+        self,
+        job_id: Union[str, JobContactsRequest, dict],
+        *,
+        reveal_email: Optional[bool] = None,
+        reveal_phone: Optional[bool] = None,
+    ) -> Task:
+        """Queue hiring-manager / recruiter research for a posting (see sync docs)."""
+        req = ops.job_contacts_request(job_id, reveal_email=reveal_email, reveal_phone=reveal_phone)
+        data = await self._c._request(req)
+        return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
+
+    async def reveal_contact(
+        self,
+        linkedin_url: Union[str, ContactRevealRequest, dict],
+        *,
+        name: Optional[str] = None,
+        reveal_email: Optional[bool] = None,
+        reveal_phone: Optional[bool] = None,
+    ) -> Task:
+        """Reveal a work email and/or phone number for one contact (see sync docs)."""
+        req = ops.contact_reveal_request(
+            linkedin_url, name=name, reveal_email=reveal_email, reveal_phone=reveal_phone
+        )
+        data = await self._c._request(req)
+        return ops.parse_task(data, self._c, None)  # type: ignore[return-value]
 
     async def vsearch(
         self,

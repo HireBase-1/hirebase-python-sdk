@@ -172,6 +172,27 @@ for job in client.jobs.stream_url(result["download_url"]):
     print(job.job_title)
 ```
 
+## Hiring manager contacts (async task flow)
+
+Requires the `hiring_manager_api` feature on your key (email spencer@hirebase.org).
+Research returns name, role and LinkedIn profile per contact; email and phone are
+optional reveals billed only when found.
+
+```python
+task = client.jobs.contacts("6ab32db8f1c329e432f72994")          # LinkedIn only
+task = client.tasks.poll(task.id, timeout=600)
+for c in task.result["contacts"]:
+    print(c["name"], c["role"], c["profile_url"])
+
+# Reveal one contact you picked (work email by default, phone on request)
+reveal = client.jobs.reveal_contact(c["profile_url"], name=c["name"], reveal_phone=True)
+reveal = client.tasks.poll(reveal.id, timeout=300)
+print(reveal.result["email"], reveal.result["phone_number"])
+
+# Or reveal every contact of a posting up front
+task = client.jobs.contacts("6ab32db8f1c329e432f72994", reveal_email=True, reveal_phone=True)
+```
+
 ## Companies
 
 ```python
