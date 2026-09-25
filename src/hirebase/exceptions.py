@@ -7,7 +7,7 @@ JavaScript SDK. Every error raised by the SDK is a subclass of
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 
 class HirebaseError(Exception):
@@ -59,7 +59,27 @@ class NotFoundError(APIError):
 
 
 class RateLimitError(APIError):
-    """429 - too many requests."""
+    """429 - too many requests (100 requests / 60 s per key).
+
+    ``retry_after`` carries the server's ``Retry-After`` seconds when present.
+    """
+
+    def __init__(self, *args: Any, retry_after: Optional[int] = None, usage: Any = None, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self.retry_after = retry_after
+        self.usage = usage
+
+
+class QuotaExceededError(RateLimitError):
+    """429 with ``X-Billing-Code: limit_exceeded`` - the plan's included
+    allowance for this meter is used up (block-mode plans). Backing off will
+    not help; lower ``limit`` to fit the remaining units or upgrade.
+
+    ``usage`` is a :class:`hirebase.UsageSnapshot` built from the response
+    headers, so ``err.usage.included_remaining`` tells you what is left.
+    Subclasses :class:`RateLimitError` so existing ``except RateLimitError``
+    handlers keep working.
+    """
 
 
 class ServerError(APIError):
@@ -86,8 +106,10 @@ class TaskTimeout(TaskError):
         super().__init__(message)
 
 
-def error_from_response(status_code: int, body: Any) -> APIError:
-    """Map an HTTP status + decoded body onto the right exception type."""
+def error_from_response(
+    status_code: int, body: Any, headers: Optional[Mapping[str, Any]] = None
+) -> APIError:
+    """Map an HTTP status + decoded body (+ headers) onto the right exception."""
     message = _extract_message(body) or f"HTTP {status_code}"
 
     if status_code == 401:
@@ -99,10 +121,32 @@ def error_from_response(status_code: int, body: Any) -> APIError:
     if status_code == 404:
         return NotFoundError(message, status_code=status_code, body=body)
     if status_code == 429:
-        return RateLimitError(message, status_code=status_code, body=body)
+        from .models.usage import UsageSnapshot  # local: avoid import cycle
+
+        usage = UsageSnapshot.from_headers(headers)
+        retry_after = _retry_after(headers)
+        if usage is not None and usage.is_blocked:
+            return QuotaExceededError(
+                message, status_code=status_code, body=body, retry_after=retry_after, usage=usage
+            )
+        return RateLimitError(
+            message, status_code=status_code, body=body, retry_after=retry_after, usage=usage
+        )
     if status_code >= 500:
         return ServerError(message, status_code=status_code, body=body)
     return APIError(message, status_code=status_code, body=body)
+
+
+def _retry_after(headers: Optional[Mapping[str, Any]]) -> Optional[int]:
+    if not headers:
+        return None
+    for key, value in headers.items():
+        if str(key).lower() == "retry-after":
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return None
+    return None
 
 
 def _extract_message(body: Any) -> Optional[str]:

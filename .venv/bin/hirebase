@@ -1,0 +1,6 @@
+#!/private/tmp/claude-501/-Users-spencer-Desktop-Cursor-Projects-docs/85a54682-b095-45a5-b076-cbb854f3bef9/scratchpad/sdk/.venv/bin/python
+import sys
+from hirebase_cli.main import app
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(app())

@@ -14,7 +14,9 @@ client = hirebase.Client(api_key="sk_live_...")
 
 ---
 
-## `companies.search(query=None, *, page=None, limit=None, return_type=None)`
+## `companies.search(query=None, *, page=None, limit=None, return_type=None, return_meta=False)`
+
+`return_meta=True` returns `(result, meta)` with the call's `ResponseMeta`; see the jobs docs for details.
 
 Search companies. Returns a `CompanySearchResult` (iterable, indexable).
 
@@ -68,7 +70,7 @@ result = client.companies.search(query)
 
 ---
 
-## `companies.get(slug, *, return_jobs=True, return_insights=False, return_type=None)`
+## `companies.get(slug, *, return_jobs=True, return_insights=False, return_type=None, return_meta=False)`
 
 Fetch a company by slug. Returns a `Company`.
 
@@ -117,7 +119,7 @@ insights = await company.insights()
 
 ---
 
-## `companies.jobs(company, *, page=None, limit=None, sort_by=None, sort_order=None, job_board=None, job_category=None, return_type=None)`
+## `companies.jobs(company, *, page=None, limit=None, sort_by=None, sort_order=None, job_board=None, job_category=None, return_type=None, return_meta=False)`
 
 Paginate a company's jobs. `company` may be a `Company`, a company dict, or a
 slug string. Returns a `JobSearchResult`.
@@ -135,7 +137,7 @@ greenhouse = client.companies.jobs("stripe", job_board="Greenhouse")
 
 ---
 
-## `companies.insights(company, *, query=None, return_type=None)`
+## `companies.insights(company, *, query=None, return_type=None, return_meta=False)`
 
 Live insights for jobs at a company. `company` may be a `Company`, dict, or
 slug. `query` (a job-search filter) further scopes the cohort; the company slug

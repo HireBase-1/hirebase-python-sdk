@@ -181,6 +181,34 @@ def export_expired_jobs_request(
     return Request("POST", "/v2/jobs/expired-jobs/export", json=body)
 
 
+def historical_search_request(
+    filters: Dict[str, Any],
+    *,
+    sample_size: Optional[int] = None,
+) -> Request:
+    body: Dict[str, Any] = dict(filters or {})
+    if sample_size is not None:
+        body["sample_size"] = sample_size
+    return Request("POST", "/v2/jobs/historical/search", json=body)
+
+
+def historical_export_request(
+    filters: Dict[str, Any],
+    *,
+    format: str = "json",
+    limit: Optional[int] = None,
+    redirect_to: Optional[str] = None,
+) -> Request:
+    if format not in ("json", "csv"):
+        raise ValueError("format must be 'json' or 'csv'")
+    body: Dict[str, Any] = {"search": dict(filters or {}), "format": format}
+    if limit is not None:
+        body["limit"] = limit
+    if redirect_to is not None:
+        body["redirect_to"] = redirect_to
+    return Request("POST", "/v2/jobs/historical/export", json=body)
+
+
 def vsearch_jobs_request(
     query: Optional[Union[JobQuery, dict]] = None,
     *,
