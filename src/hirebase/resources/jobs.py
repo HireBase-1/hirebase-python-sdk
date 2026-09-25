@@ -191,6 +191,42 @@ class JobsResource:
             req, lambda d: ops.parse_task(d, self._c, None), return_meta
         )
 
+    def historical_search(
+        self,
+        filters: dict,
+        *,
+        sample_size: Optional[int] = None,
+    ) -> dict:
+        """Free discovery over the historical archive (``jobs_expired``).
+
+        ``filters`` accepts ``job_titles``, ``keywords``, ``geo_locations`` /
+        ``location_group``, ``company_names`` / ``company_slugs`` and
+        ``date_posted_from`` / ``date_posted_to`` / ``date_expired_from`` /
+        ``date_expired_to``. Returns total_count, by_year_posted,
+        top_companies, sample_titles, coverage and export_quote.
+        """
+        req = ops.historical_search_request(filters, sample_size=sample_size)
+        return self._c._request(req)
+
+    def historical_export(
+        self,
+        filters: dict,
+        *,
+        format: str = "json",
+        limit: Optional[int] = None,
+        redirect_to: Optional[str] = None,
+    ) -> dict:
+        """Price a historical export and open Stripe Checkout for it.
+
+        Returns ``{"task_id", "checkout_url", "record_count", "price_usd", ...}``.
+        The export task is created once payment completes; poll
+        ``client.tasks.get(task_id)`` afterwards, or wait for the email.
+        """
+        req = ops.historical_export_request(
+            filters, format=format, limit=limit, redirect_to=redirect_to
+        )
+        return self._c._request(req)
+
     def salary_benchmark(
         self,
         payload: SalaryBenchmarkType = None,
@@ -451,6 +487,28 @@ class AsyncJobsResource:
         return await self._call(
             req, lambda d: ops.parse_task(d, self._c, None), return_meta
         )
+
+    async def historical_search(
+        self,
+        filters: dict,
+        *,
+        sample_size: Optional[int] = None,
+    ) -> dict:
+        req = ops.historical_search_request(filters, sample_size=sample_size)
+        return await self._c._request(req)
+
+    async def historical_export(
+        self,
+        filters: dict,
+        *,
+        format: str = "json",
+        limit: Optional[int] = None,
+        redirect_to: Optional[str] = None,
+    ) -> dict:
+        req = ops.historical_export_request(
+            filters, format=format, limit=limit, redirect_to=redirect_to
+        )
+        return await self._c._request(req)
 
     async def salary_benchmark(
         self,

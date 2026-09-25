@@ -252,3 +252,59 @@ def test_missing_api_key_raises(monkeypatch):
     monkeypatch.delenv("HIREBASE_API_KEY", raising=False)
     with pytest.raises(hirebase.ConfigurationError):
         hirebase.Client()
+
+
+def test_jobs_historical_search(mock_sync_client):
+    c = mock_sync_client
+    c.transport.add(
+        "POST",
+        "/v2/jobs/historical/search",
+        {
+            "total_count": 3096,
+            "by_year_posted": [{"year": 2025, "count": 3000}],
+            "top_companies": [{"company_name": "EDF Renewables", "count": 117}],
+            "sample_titles": [{"job_title": "ESG Analyst", "year_posted": 2025}],
+            "coverage": {"description_text_sample_pct": 88.0, "note": "..."},
+            "export_quote": {"record_count": 3096, "price_usd": 182.88, "tiers": "..."},
+        },
+    )
+    res = c.jobs.historical_search({"job_titles": ["ESG"], "date_posted_from": "2023-01-01"}, sample_size=1)
+    assert res["total_count"] == 3096
+    assert res["export_quote"]["price_usd"] == 182.88
+    sent = c.transport.calls[-1]
+    assert sent.json == {"job_titles": ["ESG"], "date_posted_from": "2023-01-01", "sample_size": 1}
+
+
+def test_jobs_historical_export_returns_checkout(mock_sync_client):
+    c = mock_sync_client
+    c.transport.add(
+        "POST",
+        "/v2/jobs/historical/export",
+        {
+            "task_id": "task-h1",
+            "checkout_url": "https://checkout.stripe.com/c/pay/cs_test",
+            "record_count": 500,
+            "price_usd": 60.0,
+            "currency": "usd",
+            "status": "awaiting_payment",
+            "format": "csv",
+            "note": "...",
+        },
+    )
+    res = c.jobs.historical_export({"job_titles": ["ESG"]}, format="csv", limit=500)
+    assert res["task_id"] == "task-h1"
+    assert res["checkout_url"].startswith("https://checkout.stripe.com/")
+    sent = c.transport.calls[-1]
+    assert sent.json == {"search": {"job_titles": ["ESG"]}, "format": "csv", "limit": 500}
+
+
+def test_jobs_historical_export_rejects_bad_format(mock_sync_client):
+    with pytest.raises(ValueError):
+        mock_sync_client.jobs.historical_export({"job_titles": ["ESG"]}, format="xlsx")
+
+
+def test_jobs_historical_async(mock_async_client):
+    c = mock_async_client
+    c.transport.add("POST", "/v2/jobs/historical/search", {"total_count": 1})
+    res = asyncio.run(c.jobs.historical_search({"job_titles": ["ESG"]}))
+    assert res["total_count"] == 1
