@@ -107,6 +107,8 @@ Put cross-repo knowledge in the shared section (and copy it to the other repos);
 
 For non-trivial work, briefly establish: desired outcome (what should actually happen), current behavior (what happens now), intent (why this part of the system appears to exist), and the minimum useful change. You do not need to produce a long plan unless one is useful. Investigate enough to make a good decision, then act. The goal is not minimal code at all costs; it is high-impact, low-unnecessary-complexity engineering.
 
+"Tested" means the changed code ran against the real thing. For any change to how we call an external service (Apollo, OpenRouter, Stripe, Mongo Atlas Search, R2), send real requests with a real key through the changed code path and check what comes back. Unit tests with mocked responses only confirm our own assumptions about the vendor's response, and they will not get a change deployed to prod. When reporting, list the live calls made (endpoint, sample inputs, result) separately from unit-test results. If something could not be exercised live (missing key, needs a worker deploy), say so rather than calling it tested.
+
 ## This repo: hirebase-python-sdk
 
 Public Python client for the Hirebase API, published to PyPI as `hirebase`. Python >= 3.9, src layout, sync and async clients, optional typer CLI (`hirebase`).
