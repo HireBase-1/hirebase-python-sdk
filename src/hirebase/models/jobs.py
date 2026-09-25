@@ -204,7 +204,9 @@ class SalaryBenchmarkRequest(BaseModel):
     sub_industry: Optional[List[str]] = None
     experience_levels: Optional[List[str]] = None
     days_ago: int = 90
-    include_expired: bool = True
+    # None = server default (currently: include expired postings). Only sent when
+    # set, so the SDK keeps working against API versions that predate the field.
+    include_expired: Optional[bool] = None
     notify: bool = False
 
     def to_payload(self) -> dict:

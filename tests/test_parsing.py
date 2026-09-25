@@ -98,3 +98,12 @@ def test_company_jobs_defaults_company_count():
     res = ops.parse_company_jobs(data, client=None, return_type=None)
     assert res.company_count == 0
     assert len(res) == 1
+
+
+def test_salary_benchmark_default_payload_omits_include_expired():
+    from hirebase.models.jobs import SalaryBenchmarkRequest
+
+    payload = SalaryBenchmarkRequest(job_title="Software Engineer").to_payload()
+    assert "include_expired" not in payload
+    assert "sub_industry" not in payload
+    assert SalaryBenchmarkRequest(job_title="x", include_expired=False).to_payload()["include_expired"] is False
