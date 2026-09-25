@@ -29,6 +29,7 @@ Quickstart:
 
 from ._version import __version__
 from .client import AsyncClient, Client
+from .models.usage import ResponseMeta, UsageSnapshot
 from .config import DEFAULT_BASE_URL, Settings
 from .exceptions import (
     APIError,
@@ -38,6 +39,7 @@ from .exceptions import (
     NotFoundError,
     PaymentRequiredError,
     PermissionError_,
+    QuotaExceededError,
     RateLimitError,
     ServerError,
     TaskError,
@@ -105,6 +107,9 @@ __all__ = [
     "PaymentRequiredError",
     "NotFoundError",
     "RateLimitError",
+    "QuotaExceededError",
+    "UsageSnapshot",
+    "ResponseMeta",
     "ServerError",
     "TaskError",
     "TaskFailed",

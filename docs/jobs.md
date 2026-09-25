@@ -13,7 +13,7 @@ client = hirebase.Client(api_key="sk_live_...")
 
 ---
 
-## `jobs.search(query=None, *, page=None, limit=None, return_type=None)`
+## `jobs.search(query=None, *, page=None, limit=None, return_type=None, return_meta=False)`
 
 Search jobs with filters. Returns a `JobSearchResult` (iterable, indexable).
 
@@ -92,7 +92,26 @@ result = client.jobs.search(query)
 
 ---
 
-## `jobs.get(job_id, *, return_type=None)`
+## Per-call usage metadata (`return_meta=True`)
+
+Every metered method (`search`, `get`, `vsearch`, `neural_search`, `insights`,
+`estimate`, `expired`, `export`, `export_expired`, `salary_benchmark`, and the
+`companies` equivalents) accepts `return_meta=True`. The call then returns a
+`(result, meta)` tuple, where `meta` is a `hirebase.ResponseMeta`:
+
+```python
+jobs, meta = client.jobs.search(query, limit=50, return_meta=True)
+meta.status_code          # 200
+meta.request_id           # X-Request-Id, if the server sent one
+meta.usage                # hirebase.UsageSnapshot from Hirebase-Usage-*, or None
+meta.usage.included_remaining
+```
+
+Without the flag the return shape is unchanged. When a block-mode plan is at
+its cap the call raises `QuotaExceededError` instead; the same snapshot is on
+`err.usage`.
+
+## `jobs.get(job_id, *, return_type=None, return_meta=False)`
 
 Fetch a single job by its id. Returns a `Job`.
 
@@ -108,7 +127,7 @@ Jobs also carry Hirebase scores when available: `compensation_value_score`,
 
 ---
 
-## `jobs.insights(query=None, *, return_type=None)`
+## `jobs.insights(query=None, *, return_type=None, return_meta=False)`
 
 Live, search-driven market insights for the cohort matching `query` (accepts the
 same filter shape as `search`). Returns a `JobInsights`.

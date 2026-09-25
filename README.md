@@ -214,7 +214,8 @@ All errors subclass `hirebase.HirebaseError`:
 | `PaymentRequiredError` | 402 — plan/credits required |
 | `PermissionError_` | 403 — not allowed |
 | `NotFoundError` | 404 |
-| `RateLimitError` | 429 |
+| `RateLimitError` | 429 from the request limiter (100 requests / 60 s per key); check `err.retry_after` |
+| `QuotaExceededError` | 429 with `X-Billing-Code: limit_exceeded`: the plan's included allowance is used up. Subclass of `RateLimitError`; `err.usage` holds the quota snapshot |
 | `ServerError` | 5xx |
 | `APIError` | any other non-2xx (`.status_code`, `.message`, `.body`) |
 | `TaskFailed` / `TaskTimeout` | export task failed or timed out |
@@ -228,6 +229,35 @@ except hirebase.RateLimitError:
     ...
 except hirebase.APIError as e:
     print(e.status_code, e.message)
+```
+
+## Tracking quota without polling
+
+Every metered response carries `Hirebase-Usage-*` headers. Pass
+`return_meta=True` to any metered method (jobs and companies, sync or async)
+to get them back with the result as a `ResponseMeta`:
+
+```python
+jobs, meta = client.jobs.search({"job_titles": ["Software Engineer"]}, limit=50, return_meta=True)
+usage = meta.usage                      # None on un-metered endpoints
+print(usage.meter, usage.total_used, "/", usage.included_limit, "remaining:", usage.included_remaining)
+if usage.is_meter_mode and usage.overage_used:
+    print("billing overage units:", usage.overage_used)
+print(meta.status_code, meta.request_id)  # transport details for the same call
+```
+
+Without the flag the return shape is unchanged, so existing code keeps working.
+
+When a block-mode plan is at its cap the API refuses the call with a 429 that
+is **not** a rate limit, so backing off will not help:
+
+```python
+try:
+    client.jobs.search(query, limit=100)
+except hirebase.QuotaExceededError as err:
+    remaining = err.usage.included_remaining   # e.g. 2 -> retry with limit=2
+except hirebase.RateLimitError as err:
+    time.sleep(err.retry_after or 5)           # the 100 req / 60 s limiter
 ```
 
 ## Development

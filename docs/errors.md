@@ -23,6 +23,7 @@ HirebaseError
 │   ├── PermissionError_      # 403 — key valid but not allowed
 │   ├── NotFoundError         # 404
 │   ├── RateLimitError        # 429
+│   │   └── QuotaExceededError  # 429 at the plan cap (X-Billing-Code: limit_exceeded); .usage has the snapshot
 │   └── ServerError           # 5xx
 └── TaskError
     ├── TaskFailed            # task ended failed/canceled
