@@ -98,6 +98,8 @@ Cross-cutting product rules:
 * **Two billing systems coexist.** Users are `legacy` or `stripe_v2`. Legacy is being sunset, not extended; migrate users off it rather than improving it. The Stripe catalog (`catalog/` in hirebase-api) is the single source of truth for products, prices, features, and meters. Stripe is never edited by hand.
 * **HireScout** (`/v2/hirescout`, www.hirescout.org) is a dead product. Do not extend it or treat it as a reference for how Hirebase should work.
 * **Vector search is non-public.** `POST /v2/jobs/vsearch` was removed from the docs in September 2026 because Neural Search (`POST /v2/jobs/neural-search`) is better for every use it had: free text via `vector.query`, similar jobs via `vector.job_ids`, resume matching via `vector.artifact_id`, plus lexical filters. Do not document, promote, or extend vsearch; steer customers and the SDK to Neural Search. The route still exists only because the web app calls it.
+* **Pay-as-you-go billing charges early; it never throttles.** Add-ons with no monthly fee (the Hiring Manager API) are charged at usage thresholds ($10, then $50, then every $100) instead of only at month end, so a bad card is caught early. Only an actual failed payment blocks new work, and even then queued tasks keep running. Never cap, pause or slow a customer because usage is unbilled or the card has not been charged yet.
+* **Apify actors live in git first.** `HireBase-1/apify-actors` is the source of truth for every Hirebase actor. Never push actor source straight to Apify: the next push from someone else's copy silently overwrites it (this lost the 2026-09-23 contacts fixes).
 
 ### Product memory
 
