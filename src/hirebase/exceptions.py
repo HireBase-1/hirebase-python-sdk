@@ -86,6 +86,24 @@ class ServerError(APIError):
     """5xx - something went wrong on the Hirebase side."""
 
 
+#: ``code`` in the 503 body while the Neural Search model is cold-starting.
+NEURAL_WARMING_UP_CODE = "neural_search_warming_up"
+
+
+class ModelWarmingUpError(ServerError):
+    """503 - the Neural Search model is starting after an idle spell.
+
+    The model keeps warming server-side, so a retry shortly after succeeds.
+    Clients retry this automatically for up to ``warmup_wait`` seconds; you
+    only see it if the model is still not ready after that.
+    ``retry_after`` carries the server's suggested wait in seconds.
+    """
+
+    def __init__(self, *args: Any, retry_after: Optional[int] = None, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+        self.retry_after = retry_after
+
+
 class TaskError(HirebaseError):
     """Raised when an async task fails or times out."""
 
@@ -131,6 +149,17 @@ def error_from_response(
             )
         return RateLimitError(
             message, status_code=status_code, body=body, retry_after=retry_after, usage=usage
+        )
+    if (
+        status_code == 503
+        and isinstance(body, dict)
+        and body.get("code") == NEURAL_WARMING_UP_CODE
+    ):
+        return ModelWarmingUpError(
+            message,
+            status_code=status_code,
+            body=body,
+            retry_after=_retry_after(headers) or body.get("retry_after"),
         )
     if status_code >= 500:
         return ServerError(message, status_code=status_code, body=body)

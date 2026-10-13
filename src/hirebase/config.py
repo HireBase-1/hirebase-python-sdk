@@ -15,6 +15,9 @@ from .exceptions import ConfigurationError
 
 DEFAULT_BASE_URL = "https://api.hirebase.org"
 DEFAULT_TIMEOUT = 30.0
+#: How long clients keep retrying while the Neural Search model warms up
+#: (a cold start takes ~1-2 minutes). 0 disables the retry.
+DEFAULT_WARMUP_WAIT = 180.0
 
 ENV_API_KEY = "HIREBASE_API_KEY"
 # ``HIREBASE_API_URL`` is accepted as a fallback for parity with the CLI.
@@ -29,6 +32,7 @@ class Settings:
     api_key: str
     base_url: str = DEFAULT_BASE_URL
     timeout: float = DEFAULT_TIMEOUT
+    warmup_wait: float = DEFAULT_WARMUP_WAIT
 
     @classmethod
     def resolve(
@@ -36,6 +40,7 @@ class Settings:
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
+        warmup_wait: Optional[float] = None,
     ) -> "Settings":
         key = api_key or os.getenv(ENV_API_KEY)
         if not key:
@@ -56,6 +61,7 @@ class Settings:
             api_key=key,
             base_url=url,
             timeout=DEFAULT_TIMEOUT if timeout is None else timeout,
+            warmup_wait=DEFAULT_WARMUP_WAIT if warmup_wait is None else warmup_wait,
         )
 
     @property
