@@ -6,14 +6,16 @@ Both clients share the same resource layer and the same request/response logic
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import time
 from typing import Any, AsyncIterator, Iterator, Optional, Tuple, Type, Union
 
 from . import _ops as ops
 from .config import Settings
 from .models.usage import ResponseMeta
-from .exceptions import error_from_response
+from .exceptions import ModelWarmingUpError, error_from_response
 from .resources.companies import AsyncCompaniesResource, CompaniesResource
 from .resources.jobs import AsyncJobsResource, JobsResource
 from .resources.resumes import AsyncResumesResource, ResumesResource
@@ -39,8 +41,9 @@ class Client:
         *,
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
+        warmup_wait: Optional[float] = None,
     ) -> None:
-        self._settings = Settings.resolve(api_key, base_url, timeout)
+        self._settings = Settings.resolve(api_key, base_url, timeout, warmup_wait)
         import requests  # local import keeps httpx-only users lean
 
         self._session = requests.Session()
@@ -67,8 +70,20 @@ class Client:
         """Send ``req``; return ``(decoded_body, ResponseMeta)``.
 
         Resource methods call this when ``return_meta=True`` so callers get the
-        ``Hirebase-Usage-*`` quota snapshot for that exact call.
+        ``Hirebase-Usage-*`` quota snapshot for that exact call. Retries while
+        the Neural Search model warms up (see ``warmup_wait``).
         """
+        deadline = time.monotonic() + self._settings.warmup_wait
+        while True:
+            try:
+                return self._send(req)
+            except ModelWarmingUpError as err:
+                delay = _warmup_delay(err, deadline)
+                if delay is None:
+                    raise
+                time.sleep(delay)
+
+    def _send(self, req: ops.Request) -> Tuple[Any, ResponseMeta]:
         kwargs: dict = {
             "method": req.method,
             "url": self._url(req.path),
@@ -140,8 +155,9 @@ class AsyncClient:
         *,
         base_url: Optional[str] = None,
         timeout: Optional[float] = None,
+        warmup_wait: Optional[float] = None,
     ) -> None:
-        self._settings = Settings.resolve(api_key, base_url, timeout)
+        self._settings = Settings.resolve(api_key, base_url, timeout, warmup_wait)
         import httpx
 
         self._http = httpx.AsyncClient(
@@ -165,7 +181,21 @@ class AsyncClient:
         return (await self._request_meta(req))[0]
 
     async def _request_meta(self, req: ops.Request) -> Tuple[Any, ResponseMeta]:
-        """Send ``req``; return ``(decoded_body, ResponseMeta)``."""
+        """Send ``req``; return ``(decoded_body, ResponseMeta)``.
+
+        Retries while the Neural Search model warms up (see ``warmup_wait``).
+        """
+        deadline = time.monotonic() + self._settings.warmup_wait
+        while True:
+            try:
+                return await self._send(req)
+            except ModelWarmingUpError as err:
+                delay = _warmup_delay(err, deadline)
+                if delay is None:
+                    raise
+                await asyncio.sleep(delay)
+
+    async def _send(self, req: ops.Request) -> Tuple[Any, ResponseMeta]:
         if req.files is not None:
             resp = await self._http.request(
                 req.method, req.path, params=req.params, files=req.files, timeout=self._settings.timeout
@@ -232,6 +262,14 @@ def _decode_body(content: bytes) -> Any:
             return content.decode("utf-8")
         except Exception:  # pragma: no cover - defensive
             return None
+
+
+def _warmup_delay(err: ModelWarmingUpError, deadline: float) -> Optional[float]:
+    """Seconds to wait before retrying a warming-up 503, or None to give up."""
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return None
+    return min(float(err.retry_after or 10), remaining)
 
 
 def _handle_response(status_code: int, content: bytes, _resp: Any) -> Any:

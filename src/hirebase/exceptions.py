@@ -82,8 +82,25 @@ class QuotaExceededError(RateLimitError):
     """
 
 
+#: ``code`` in the API's response while the Neural Search model is cold-starting.
+NEURAL_WARMING_UP_CODE = "neural_search_warming_up"
+
+
+class ModelWarmingUpError(RateLimitError):
+    """The Neural Search model is starting after an idle spell (up to a few minutes).
+
+    The API sends it as 429 + ``Retry-After`` with
+    ``code: "neural_search_warming_up"``. The model keeps warming server-side,
+    so a retry shortly after succeeds. Clients retry this automatically for
+    up to ``warmup_wait`` seconds; you only see it if the model is still not
+    ready after that. Subclasses :class:`RateLimitError`, so existing
+    ``except RateLimitError`` backoff code handles it too.
+    """
+
+
 class ServerError(APIError):
     """5xx - something went wrong on the Hirebase side."""
+
 
 
 class TaskError(HirebaseError):
@@ -112,6 +129,15 @@ def error_from_response(
     """Map an HTTP status + decoded body (+ headers) onto the right exception."""
     message = _extract_message(body) or f"HTTP {status_code}"
 
+    # Matched on code, not status: sent as 429 because DigitalOcean rewrites
+    # app 503s into a bare 504.
+    if isinstance(body, dict) and body.get("code") == NEURAL_WARMING_UP_CODE:
+        return ModelWarmingUpError(
+            message,
+            status_code=status_code,
+            body=body,
+            retry_after=_retry_after(headers) or body.get("retry_after"),
+        )
     if status_code == 401:
         return AuthenticationError(message, status_code=status_code, body=body)
     if status_code == 402:
