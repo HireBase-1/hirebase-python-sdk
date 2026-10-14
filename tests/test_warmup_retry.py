@@ -7,7 +7,13 @@ import pytest
 
 import hirebase
 from hirebase import _ops as ops
-from hirebase.exceptions import ModelWarmingUpError, ServerError, error_from_response
+from hirebase.exceptions import (
+    ModelWarmingUpError,
+    QuotaExceededError,
+    RateLimitError,
+    ServerError,
+    error_from_response,
+)
 
 WARMING = {
     "detail": "Neural Search is starting up. Retry in about 30 seconds.",
@@ -36,20 +42,22 @@ def _script(*responses):
 
 
 def _warming():
-    return FakeResponse(503, WARMING, {"Retry-After": "30"})
+    return FakeResponse(429, WARMING, {"Retry-After": "30"})
 
 
 REQ = ops.Request("POST", "/v2/jobs/neural-search", json={"vector": {"query": "nurse"}})
 
 
-def test_503_warming_maps_to_model_warming_up_error():
-    err = error_from_response(503, WARMING, {"Retry-After": "30"})
+def test_warming_429_maps_to_model_warming_up_error():
+    err = error_from_response(429, WARMING, {"Retry-After": "30"})
     assert isinstance(err, ModelWarmingUpError)
-    assert isinstance(err, ServerError)  # existing `except ServerError` still works
+    assert isinstance(err, RateLimitError)  # existing `except RateLimitError` still works
+    assert not isinstance(err, QuotaExceededError)
     assert err.retry_after == 30
 
 
-def test_plain_503_is_not_retried_as_warming():
+def test_plain_429_and_503_are_not_warming():
+    assert type(error_from_response(429, {"detail": "Rate limit exceeded"})) is RateLimitError
     assert type(error_from_response(503, {"detail": "down"})) is ServerError
 
 
