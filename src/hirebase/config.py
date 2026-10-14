@@ -16,8 +16,8 @@ from .exceptions import ConfigurationError
 DEFAULT_BASE_URL = "https://api.hirebase.org"
 DEFAULT_TIMEOUT = 30.0
 #: How long clients keep retrying while the Neural Search model warms up
-#: (a cold start takes ~1-2 minutes). 0 disables the retry.
-DEFAULT_WARMUP_WAIT = 180.0
+#: (cold starts have taken 75s to just over 3 minutes). 0 disables the retry.
+DEFAULT_WARMUP_WAIT = 300.0
 
 ENV_API_KEY = "HIREBASE_API_KEY"
 # ``HIREBASE_API_URL`` is accepted as a fallback for parity with the CLI.

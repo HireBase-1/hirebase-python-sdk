@@ -87,7 +87,7 @@ NEURAL_WARMING_UP_CODE = "neural_search_warming_up"
 
 
 class ModelWarmingUpError(RateLimitError):
-    """The Neural Search model is starting after an idle spell (~1-2 minutes).
+    """The Neural Search model is starting after an idle spell (up to a few minutes).
 
     The API sends it as 429 + ``Retry-After`` with
     ``code: "neural_search_warming_up"``. The model keeps warming server-side,
