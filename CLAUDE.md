@@ -75,6 +75,7 @@ For job data:
 * Prefer source evidence over unsupported inference.
 * Accuracy and trustworthiness matter more than artificially filling every field.
 * `null` can be better than a confident hallucination.
+* Public pages show only measured numbers. A figure derived from a formula or multiplier (salary by experience as median × 0.72, total comp as median × 1.18, a drawn distribution) must not be presented as data. When too little data backs a figure, show less, or let the page not exist (role insight pages: `role_page_publishable` in hirebase-api).
 * Consider processing and inference cost when adding classification.
 * Freshness and reliability are important product characteristics.
 
