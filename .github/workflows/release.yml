@@ -23,7 +23,7 @@ jobs:
   test:
     # Pinned: setup-python has no Python 3.9 build for ubuntu-26.04, which
     # ubuntu-latest moves to from 2026-10-19. Drop the pin with 3.9 support.
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
       matrix:
@@ -53,7 +53,7 @@ jobs:
 
   build:
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     outputs:
       version: ${{ steps.get_version.outputs.version }}
     steps:
@@ -82,7 +82,7 @@ jobs:
 
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     # The dedicated environment lets you add required reviewers / branch
     # restrictions before anything is published.
     environment:
@@ -103,7 +103,7 @@ jobs:
     name: Notify Slack
     needs: [test, build, publish]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
       GITHUB_EVENT_NAME: ${{ github.event_name }}
