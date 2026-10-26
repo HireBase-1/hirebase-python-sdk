@@ -6,7 +6,7 @@ This file has two parts. **Shared Hirebase context** is identical across every H
 
 ### How to think
 
-Use good judgment. These are guidelines, not rigid rules.
+Use good judgment. These are guidelines, not rigid rules. They bias toward caution over speed; for trivial tasks, use judgment.
 Optimize for the 80/20: make changes that meaningfully improve the product, reliability, customer experience, or our ability to operate the system.
 Prefer simple, high-impact solutions over technically complete or theoretically ideal ones.
 Before making a meaningful change, ask:
@@ -19,11 +19,12 @@ Before making a meaningful change, ask:
 6. Is there a simpler way to get most of the benefit?
 
 Do not confuse "this could work differently" with "this needs to be changed."
+These guidelines are working if diffs carry fewer unnecessary changes, fewer rewrites come from overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
-### Understand product intent
+### Think before coding
 
-Code should be interpreted in the context of the product.
-Before changing a feature, endpoint, or workflow, try to understand:
+Don't assume. Don't hide confusion. Surface tradeoffs.
+Code should be interpreted in the context of the product. Before changing a feature, endpoint, or workflow, understand:
 
 * why it exists
 * its primary use case
@@ -32,35 +33,75 @@ Before changing a feature, endpoint, or workflow, try to understand:
 * what it intentionally does not support
 * relevant performance, cost, scale, or accuracy tradeoffs
 
-Use the codebase to investigate this when necessary. Look at callers, routes, tests, documentation, frontend usage, comments, schemas, and related implementations.
+Use the codebase to answer what it can: callers, routes, tests, documentation, frontend usage, comments, schemas, and related implementations.
 A limitation or inconsistency is not automatically a bug. Some functionality is intentionally narrow. For example: the expired-jobs feed returns identifiers only and costs nothing; the missing job bodies are deliberate, not a gap to fill. Understand the intended use case before expanding behavior.
 
-### Make the smallest useful change
+Then, before implementing:
+
+* State your assumptions explicitly. If you are still uncertain, ask.
+* If the request has more than one reasonable interpretation, present them. Don't pick one silently.
+* If a simpler approach exists, say so. Push back when warranted.
+* If something is unclear, stop. Name what is confusing and ask.
+
+### Simplicity first
+
+Write the minimum code that solves the problem. Nothing speculative.
+
+* No features beyond what was asked.
+* No abstractions for single-use code.
+* No flexibility or configuration that wasn't requested.
+* No error handling for impossible or extremely unlikely scenarios.
+* Don't make every endpoint support the same functionality.
+* No broad architectural changes when a local solution is sufficient.
+* If you write 200 lines and it could be 50, rewrite it.
 
 Generally prefer: small fix → change existing behavior → extend an existing abstraction → create a new abstraction → architectural change.
-But use judgment. Do not avoid a larger change when the larger change is clearly worthwhile.
-For every meaningful addition, ask: if I didn't make this part of the change, would the user or product meaningfully suffer? If not, consider leaving it out.
-Avoid doing work primarily because it makes the system more theoretically complete. Be cautious about:
+For every addition, ask: if I left this out, would the user or product meaningfully suffer? If not, leave it out. Ask too: would a senior engineer call this overcomplicated? If yes, simplify.
+When a larger change (a new abstraction, an architectural improvement) has a clear, concrete payoff, propose it and say why. Don't fold it into the task unasked.
 
-* unrelated refactors
-* abstractions for one-off cases
-* speculative future-proofing
-* configuration nobody currently needs
-* making all endpoints support the same functionality
-* defensive handling for extremely unlikely situations
-* broad architectural changes when a local solution is sufficient
+### Surgical changes
 
-Do not over-engineer, but do not be afraid to improve architecture when there is a concrete payoff.
+Touch only what you must. Clean up only your own mess.
+When editing existing code:
+
+* Don't "improve" adjacent code, comments, or formatting.
+* Don't refactor things that aren't broken.
+* Match existing style, even if you'd do it differently.
+* If you notice unrelated dead code, mention it. Don't delete it.
+
+When your changes create orphans, remove the imports, variables, and functions that your change made unused. Don't remove pre-existing dead code unless asked.
+The test: every changed line should trace directly to the user's request.
 
 ### Bugs
 
-If something is clearly a real bug affecting intended behavior, fix it. A small, obvious bug does not need an elaborate product justification. Use proportionality:
+For a bug that is part of the task, use proportionality. A small, obvious bug does not need an elaborate product justification.
 
 * obvious bug + simple fix → fix it
 * significant bug → investigate enough to understand the root cause
 * behavior that merely looks strange → determine whether it is actually unintended before changing it
 
-Do not expand the scope of a bug fix unnecessarily.
+Do not expand the scope of a bug fix. A bug you notice outside the task: mention it, don't fix it unasked.
+
+### Goal-driven execution
+
+Define success criteria, then loop until they are verified.
+For non-trivial work, first establish the desired outcome (what should actually happen), the current behavior (what happens now), the intent (why this part of the system appears to exist), and the minimum useful change. Then turn the task into verifiable goals:
+
+* "Add validation" → write tests for invalid inputs, then make them pass.
+* "Fix the bug" → write a test that reproduces it, then make it pass.
+* "Refactor X" → make sure tests pass before and after.
+
+For multi-step tasks, state a brief plan with a check for each step:
+
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you work through a task independently. Weak ones ("make it work") need constant clarification.
+
+"Tested" means the changed code ran against the real thing. For any change to how we call an external service (Apollo, OpenRouter, Stripe, Mongo Atlas Search, R2), send real requests with a real key through the changed code path and check what comes back. Unit tests with mocked responses only confirm our own assumptions about the vendor's response, and they will not get a change deployed to prod. When reporting, list the live calls made (endpoint, sample inputs, result) separately from unit-test results. If something could not be exercised live (missing key, needs a worker deploy), say so rather than calling it tested.
 
 ### Prioritize impact
 
@@ -75,6 +116,7 @@ For job data:
 * Prefer source evidence over unsupported inference.
 * Accuracy and trustworthiness matter more than artificially filling every field.
 * `null` can be better than a confident hallucination.
+* Public pages show only measured numbers. A figure derived from a formula or multiplier (salary by experience as median × 0.72, total comp as median × 1.18, a drawn distribution) must not be presented as data. When too little data backs a figure, show less, or let the page not exist (role insight pages: `role_page_publishable` in hirebase-api).
 * Consider processing and inference cost when adding classification.
 * Freshness and reliability are important product characteristics.
 
@@ -94,7 +136,7 @@ Do not add expensive processing unless the expected improvement justifies the co
 Cross-cutting product rules:
 
 * **Origin matters more than the endpoint.** The same API route often costs zero for web-origin (JWT) dashboard browsing and real metered units for API-key calls. Anonymous web gets a first-page tease on many routes; anonymous API is always rejected. This is deliberate. Do not "fix" it by making costs or access uniform across origins.
-* **If an endpoint is not in the public docs, treat it as nonexistent.** Remove it rather than fix or enable it.
+* **If an endpoint is not in the public docs, treat it as nonexistent.** When a task touches one, remove it rather than fix or enable it. If you only notice one in passing, mention it.
 * **Two billing systems coexist.** Users are `legacy` or `stripe_v2`. Legacy is being sunset, not extended; migrate users off it rather than improving it. The Stripe catalog (`catalog/` in hirebase-api) is the single source of truth for products, prices, features, and meters. Stripe is never edited by hand.
 * **HireScout** (`/v2/hirescout`, www.hirescout.org) is a dead product. Do not extend it or treat it as a reference for how Hirebase should work.
 * **Vector search is non-public.** `POST /v2/jobs/vsearch` was removed from the docs in September 2026 because Neural Search (`POST /v2/jobs/neural-search`) is better for every use it had: free text via `vector.query`, similar jobs via `vector.job_ids`, resume matching via `vector.artifact_id`, plus lexical filters. Do not document, promote, or extend vsearch; steer customers and the SDK to Neural Search. The route still exists only because the web app calls it.
@@ -106,12 +148,6 @@ Cross-cutting product rules:
 Maintain this file as you learn important things about how Hirebase is intended to work. Useful things to preserve: the purpose of important features, primary customer use cases, deliberate limitations, important non-goals, architectural tradeoffs, decisions Spencer or John explain, and mistakes or assumptions future Claude sessions are likely to repeat.
 Capture the underlying principle rather than the specific incident. Bad: "Remove the vsearch docs page." Better: "Vector search is non-public; Neural Search is the one supported semantic endpoint."
 Put cross-repo knowledge in the shared section (and copy it to the other repos); put repo-only knowledge under **This repo**. Use restraint. Do not add temporary task details, obvious facts easily discovered from code, speculative conclusions, minor implementation details, or every correction you receive. If you are uncertain whether something represents a durable product decision, ask before treating it as one.
-
-### Working style
-
-For non-trivial work, briefly establish: desired outcome (what should actually happen), current behavior (what happens now), intent (why this part of the system appears to exist), and the minimum useful change. You do not need to produce a long plan unless one is useful. Investigate enough to make a good decision, then act. The goal is not minimal code at all costs; it is high-impact, low-unnecessary-complexity engineering.
-
-"Tested" means the changed code ran against the real thing. For any change to how we call an external service (Apollo, OpenRouter, Stripe, Mongo Atlas Search, R2), send real requests with a real key through the changed code path and check what comes back. Unit tests with mocked responses only confirm our own assumptions about the vendor's response, and they will not get a change deployed to prod. When reporting, list the live calls made (endpoint, sample inputs, result) separately from unit-test results. If something could not be exercised live (missing key, needs a worker deploy), say so rather than calling it tested.
 
 ## This repo: hirebase-python-sdk
 
