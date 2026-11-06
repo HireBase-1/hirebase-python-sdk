@@ -202,7 +202,7 @@ def search(
     ),
     sort_by: str = typer.Option(
         "relevance", "--sort", "-s",
-        help="Sort by: relevance, date_posted, salary, company, yoe"
+        help="Sort by: relevance, date_posted, first_ingested, salary, yoe"
     ),
     sort_order: str = typer.Option(
         "desc", "--order", "-o",
